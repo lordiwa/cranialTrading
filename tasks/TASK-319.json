@@ -1,0 +1,32 @@
+{
+  "key": "TASK-319",
+  "title": "El autocompletado del buscador no distingue \"Scryfall fallo\" de \"sin coincidencias\": getCardSuggestions traga el error",
+  "description": "ORIGEN: wargaming Wrecker Etapa D contra PRODUCCION, 2026-09-24, v1.59.14. Hallazgo WG-CRANIAL-LIVE-002 (convergente con PAPER-005). Reporte: https://claude.ai/artifact/DdMzHtvAvSYpBVUCBxS7LD . Triaje: https://claude.ai/artifact/1semXEqNj3pyT6BFcqteS1 .\n\nSINTOMA (MEDIDO por el QA): un termino que Scryfall rechaza (<img src=x onerror=alert(1)>) -> GET cards/autocomplete 503, consola \"Error en getCardSuggestions: TypeError: Failed to fetch\", la UI no muestra nada. No es XSS (el termino se escapa).\n\nCAUSA (LEIDA): src/services/scryfall.ts getCardSuggestions hace `catch { console.error(...); return [] }` y tambien devuelve [] en !response.ok. Los llamadores (GlobalSearch, FilterPanel, AddCardModal) no pueden distinguir un fallo de una lista vacia.\n\nSEVERIDAD BAJA (bajada desde media en el triaje): con un termino basura, no mostrar sugerencias es el resultado correcto. Solo importa cuando Scryfall esta caido de verdad. Falta evidencia de lo que pasa al pulsar Enter (la busqueda en si); se le pidio al QA.\n\nNada en develop posterior a v1.59.14 toca scryfall.ts.\n\nCASOS DE USO: pendientes de redactar y aprobar por Mato antes de implementar. Prioridad baja: va despues de LIVE-001.",
+  "acceptance_criteria": [
+    "Cuando el autocompletado falla por red o por un error 5xx de Scryfall, el usuario ve un aviso breve de que la busqueda no esta disponible, distinto del estado sin coincidencias.",
+    "Un termino sin coincidencias (respuesta 200 con lista vacia) sigue mostrando el estado vacio actual, sin aviso de error.",
+    "Pulsar Enter con un termino que Scryfall rechaza muestra un resultado o mensaje en la pantalla de busqueda, nunca una pantalla muda.",
+    "El cambio se aplica en las superficies que usan getCardSuggestions (GlobalSearch, FilterPanel, AddCardModal)."
+  ],
+  "status": "todo",
+  "priority": "low",
+  "labels": [
+    "bug",
+    "wargaming",
+    "wrecker",
+    "search",
+    "ux"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-24T22:21:48.637Z",
+  "updated_at": "2026-09-24T22:21:48.637Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "requires_uat": true,
+  "marker": "[EXPLICIT]",
+  "source_tier": "T1"
+}

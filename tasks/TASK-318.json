@@ -1,0 +1,42 @@
+{
+  "key": "TASK-318",
+  "title": "Cambiar la condicion (o foil / impresion) de una carta en el detalle DUPLICA el stock: crea una fila nueva y deja la original intacta",
+  "description": "ORIGEN: wargaming Wrecker Etapa D contra PRODUCCION, 2026-09-24, build v1.59.14 (index-BsVSvNzG.js). Hallazgo WG-CRANIAL-LIVE-001 (convergente con PAPER-003). Reporte del QA: https://claude.ai/artifact/DdMzHtvAvSYpBVUCBxS7LD . Triaje de desarrollo: https://claude.ai/artifact/1semXEqNj3pyT6BFcqteS1 .\n\nSINTOMA (MEDIDO por el QA en prod, cuenta qa@): Rockalanche NM x5 en venta -> detalle de carta -> Condicion NM -> LP -> GUARDAR -> recargar. Resultado: Rockalanche LP x5 (fila nueva) + Rockalanche NM x5 (original, intacta). Cartas 5 -> 10, En venta $1.75 -> $3.50, Unicas 1 -> 2. La cuenta qa@ conserva el estado como evidencia.\n\nCAUSA (LEIDA en el codigo de develop 7459919, no reproducida por nosotros):\n- src/components/collection/CardDetailModal.vue handleSave arma `identity` con la condicion/foil/print NUEVOS (comentario SCRUM-35: \"del print/condition NUEVOS si el usuario cambio en el modal\").\n- fetchServerCardsByPrint y computeStatusOperations (src/utils/cardSaveDiff.ts) y el snapshot idsByStatus de applyStatusOperations filtran filas existentes por esa identidad NUEVA (`c.condition === cardData.condition`).\n- Con LP no hay match -> op 'create' LP x5. Ningun paso de handleSave borra ni actualiza las filas de la identidad ORIGINAL (savedCard / savedRelatedCards).\n\nALCANCE PROBABLE (SUPUESTO, mismo mecanismo): cambiar foil o la impresion (scryfallId/edition) deberia duplicar igual. Las asignaciones a mazos/carpetas (STEP 3 / 3.5) se calculan sobre savedRelatedCards, asi que pueden quedar apuntando a la fila vieja.\n\nNINGUN commit de develop posterior a v1.59.14 toca CardDetailModal.vue ni cardSaveDiff.ts: el defecto sigue presente en develop.\n\nFlujo de negocio prioritario n.3 (quitar/vender). Regresion obligatoria contra el defecto reproducido.\n\nCASOS DE USO: borrador en el primer comentario; PENDIENTES DE APROBACION de Mato. No se implementa hasta la aprobacion.",
+  "acceptance_criteria": [
+    "Cambiar la condicion de una carta en el detalle y guardar deja UNA sola fila con la condicion nueva y la misma cantidad; la fila de la condicion anterior desaparece (verificado recargando).",
+    "Lo mismo al cambiar foil y al cambiar la impresion (edicion).",
+    "Si ya existe una fila con la identidad destino, las cantidades se fusionan en una sola fila, sin duplicados.",
+    "Una carta repartida en varios estados (venta + cambio) conserva el reparto por estado bajo la identidad nueva.",
+    "Las asignaciones a mazos y carpetas siguen a la fila nueva; ninguna queda apuntando a una fila borrada.",
+    "Un fallo parcial de escritura muestra el mensaje de error/parcial y no deja un duplicado silencioso.",
+    "El perfil publico y el indice (card_index / public_cards) muestran la carta una sola vez con la identidad nueva.",
+    "Test de regresion que reproduce el caso NM x5 -> LP y falla contra el codigo actual."
+  ],
+  "status": "todo",
+  "priority": "high",
+  "labels": [
+    "bug",
+    "wargaming",
+    "wrecker",
+    "collection",
+    "flujo-3"
+  ],
+  "assignee": null,
+  "depends_on": [],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-09-24T22:22:18.969Z",
+      "body": "CASOS DE USO — BORRADOR, PENDIENTE DE APROBACION DE MATO. No se despacha al developer hasta la aprobacion explicita.\n\nActor: usuario logueado dueno de la carta, en /collection -> detalle de carta. Postcondicion medida siempre despues de recargar.\n\nCAMINO FELIZ\n1. Rockalanche NM x5 en venta -> Condicion LP -> GUARDAR. Termina en: una sola fila LP x5 en venta; ninguna fila NM; Cartas 5, valor en venta igual.\n\nALTERNATIVOS\n2. Cambiar foil (no foil -> foil). Termina en: una sola fila foil con la misma cantidad; ninguna fila no-foil.\n3. Cambiar la impresion (edicion). Termina en: una sola fila con la impresion nueva; ninguna con la vieja.\n4. Destino ya existente: NM x5 -> LP cuando ya hay LP x2 en venta. Termina en: una sola fila LP x7; ninguna NM.\n5. Condicion y cantidad juntas: NM x5 -> LP x3. Termina en: solo LP x3.\n6. Carta en varios estados: NM x3 venta + NM x2 cambio -> LP. Termina en: LP x3 venta + LP x2 cambio; ninguna NM.\n7. Carta asignada a un mazo y a una carpeta -> cambiar condicion. Termina en: el mazo y la carpeta muestran la carta con la condicion nueva; ninguna asignacion apunta a una fila borrada.\n\nEXCEPCION\n8. Una escritura falla a mitad del guardado. Termina en: aviso de error o de guardado parcial; nunca dos filas silenciosas (a lo sumo el estado anterior intacto).\n9. GUARDAR dos veces seguidas (doble clic). Termina en: el mismo resultado que un clic.\n10. Guardar sin cambiar nada. Termina en: ninguna escritura nueva, la fila queda igual.\n\nPUBLICO\n11. /@usuario tras el caso 1. Termina en: la carta aparece una vez, LP x5; card_index y public_cards sin la entrada NM."
+    }
+  ],
+  "created_at": "2026-09-24T22:21:39.293Z",
+  "updated_at": "2026-09-24T22:22:18.969Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "requires_uat": true,
+  "marker": "[EXPLICIT]",
+  "source_tier": "T1"
+}

@@ -25,9 +25,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "orchestrator",
+      "at": "2026-09-24T22:21:55.707Z",
+      "body": "[FINDING-HIGH: TASK-306-RULES] El fix 7b728fa resuelve el precio contra public_cards DENTRO de submitBuyRequest, que corre en el navegador. firestore.rules:179-181 permite `create` en users/{userId}/buyRequests a CUALQUIERA (sin auth) con la unica condicion `status == 'pending'`: no valida items[].price ni totalValue. Un atacante que escriba directo a Firestore (sin pasar por la UI) sigue fijando el precio que quiera. LEIDO en el codigo de develop 7459919, no reproducido.\n\nCONTEXTO: el wargaming Wrecker del 2026-09-24 (WG-CRANIAL / PAPER-001) confirmo la manipulacion del precio contra PRODUCCION v1.59.14, que NO tiene 7b728fa. Su confirmacion es del codigo viejo. El reataque contra dev (que si tiene 7b728fa) tiene que incluir la escritura directa a Firestore, no solo editar localStorage. Evidencia en prod: pedido \"QA Wrecker TAMPER\" (NM x1, $0.01) en la cuenta qa@. Reporte: https://claude.ai/artifact/DdMzHtvAvSYpBVUCBxS7LD . Triaje: https://claude.ai/artifact/1semXEqNj3pyT6BFcqteS1 .\n\nOpciones a decidir (no decididas): (a) mover la creacion del pedido a una Cloud Function que resuelva el precio en el servidor, (b) que el vendedor nunca use el precio guardado y lo re-resuelva al cumplir, (c) reglas que validen contra public_cards con get() (limitado por el numero de items)."
+    }
+  ],
   "created_at": "2026-09-19T12:00:00.000Z",
-  "updated_at": "2026-09-19T12:00:00.000Z",
+  "updated_at": "2026-09-24T22:21:55.707Z",
   "jira_key": null,
   "verification_tier": "tests-after"
 }

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-20T02:48:15.652Z",
+  "generated_at": "2026-09-24T22:22:18.969Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1782,6 +1782,18 @@
       "title": "El decremento de cantidad no se propaga al indice publico: tras cumplir pedidos la vitrina sigue ofreciendo x12 con 7 en stock, y el carrito hereda ese maxQuantity",
       "status": "todo",
       "priority": "medium"
+    },
+    {
+      "key": "TASK-318",
+      "title": "Cambiar la condicion (o foil / impresion) de una carta en el detalle DUPLICA el stock: crea una fila nueva y deja la original intacta",
+      "status": "todo",
+      "priority": "high"
+    },
+    {
+      "key": "TASK-319",
+      "title": "El autocompletado del buscador no distingue \"Scryfall fallo\" de \"sin coincidencias\": getCardSuggestions traga el error",
+      "status": "todo",
+      "priority": "low"
     }
   ]
 }

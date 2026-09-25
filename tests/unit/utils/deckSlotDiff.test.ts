@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildOriginalSlots,
+  computeDeckMigrationOps,
   computeDeckSlotOps,
+  type DeckRowAllocation,
   type DeckSlot,
   type DeckSlotOp,
 } from '@/utils/deckSlotDiff'
@@ -191,5 +193,59 @@ describe('computeDeckSlotOps — diff per (deck, board)', () => {
       identityChanged: true,
     })
     expect(ops).toEqual([])
+  })
+})
+
+describe('computeDeckMigrationOps — TASK-318 H7: per-row migration, no aggregation', () => {
+  // Regression for R1 (rev4 probe): two source rows (sale x3, trade x2) both
+  // allocated to the SAME deck used to get merged into one total (5) and
+  // reallocated onto a single destination row — the sale row's own quantity
+  // (3) capped the allocate call, and the leftover 2 silently overflowed
+  // into a NEW wishlist row instead of landing on the trade row.
+  it('migrates each row to its own mapped id, preserving the per-status split (no overflow)', () => {
+    const rows: DeckRowAllocation[] = [
+      { deckId: 'D1', cardId: 'nm-sale', mb: 3, sb: 0 },
+      { deckId: 'D1', cardId: 'nm-trade', mb: 2, sb: 0 },
+    ]
+    const idByCardId = new Map([['nm-sale', 'lp-sale'], ['nm-trade', 'lp-trade']])
+    const ops = computeDeckMigrationOps(rows, idByCardId)
+    expect(ops).toEqual<DeckSlotOp[]>([
+      { type: 'deallocate', deckId: 'D1', cardId: 'nm-sale', isInSideboard: false },
+      { type: 'allocate', deckId: 'D1', cardId: 'lp-sale', quantity: 3, isInSideboard: false },
+      { type: 'deallocate', deckId: 'D1', cardId: 'nm-trade', isInSideboard: false },
+      { type: 'allocate', deckId: 'D1', cardId: 'lp-trade', quantity: 2, isInSideboard: false },
+    ])
+  })
+
+  it('migrates mb and sb independently for a single row', () => {
+    const rows: DeckRowAllocation[] = [{ deckId: 'D1', cardId: 'nm', mb: 3, sb: 2 }]
+    const idByCardId = new Map([['nm', 'lp']])
+    const ops = computeDeckMigrationOps(rows, idByCardId)
+    expect(ops).toEqual<DeckSlotOp[]>([
+      { type: 'deallocate', deckId: 'D1', cardId: 'nm', isInSideboard: false },
+      { type: 'allocate', deckId: 'D1', cardId: 'lp', quantity: 3, isInSideboard: false },
+      { type: 'deallocate', deckId: 'D1', cardId: 'nm', isInSideboard: true },
+      { type: 'allocate', deckId: 'D1', cardId: 'lp', quantity: 2, isInSideboard: true },
+    ])
+  })
+
+  // A row already at its own mapped id (destination-only row that's already
+  // its own canonical, or identity genuinely unchanged) must not be touched
+  // at all — no dealloc/realloc no-op churn.
+  it('skips a row whose mapped id is itself (nothing to move)', () => {
+    const rows: DeckRowAllocation[] = [{ deckId: 'D1', cardId: 'lp-existing', mb: 2, sb: 0 }]
+    const idByCardId = new Map([['lp-existing', 'lp-existing']])
+    expect(computeDeckMigrationOps(rows, idByCardId)).toEqual([])
+  })
+
+  it('skips a row with no allocation at all (mb=0, sb=0)', () => {
+    const rows: DeckRowAllocation[] = [{ deckId: 'D1', cardId: 'nm', mb: 0, sb: 0 }]
+    const idByCardId = new Map([['nm', 'lp']])
+    expect(computeDeckMigrationOps(rows, idByCardId)).toEqual([])
+  })
+
+  it('falls back to the row\'s own id when no mapping exists (treated as unmapped, no-op)', () => {
+    const rows: DeckRowAllocation[] = [{ deckId: 'D1', cardId: 'nm', mb: 3, sb: 0 }]
+    expect(computeDeckMigrationOps(rows, new Map())).toEqual([])
   })
 })

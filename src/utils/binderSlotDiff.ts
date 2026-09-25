@@ -64,3 +64,27 @@ export const computeBinderSlotOps = ({
   }
   return ops
 }
+
+export interface BinderRowAllocation {
+  binderId: string
+  cardId: string
+  quantity: number
+}
+
+// TASK-318 H7: binder counterpart of computeDeckMigrationOps (deckSlotDiff.ts)
+// — same cause (aggregating multiple rows' allocations onto one ownedCardId
+// silently caps at that row's own quantity), same fix (move each row's own
+// allocation directly to its mapped destination id, no aggregation).
+export const computeBinderMigrationOps = (
+  rows: readonly BinderRowAllocation[],
+  idByCardId: ReadonlyMap<string, string>,
+): BinderSlotOp[] => {
+  const ops: BinderSlotOp[] = []
+  for (const row of rows) {
+    const mappedId = idByCardId.get(row.cardId) ?? row.cardId
+    if (mappedId === row.cardId || row.quantity <= 0) continue
+    ops.push({ type: 'deallocate', binderId: row.binderId, cardId: row.cardId })
+    ops.push({ type: 'allocate', binderId: row.binderId, cardId: mappedId, quantity: row.quantity })
+  }
+  return ops
+}

@@ -84,3 +84,48 @@ export const computeDeckSlotOps = ({
   }
   return ops
 }
+
+export interface DeckRowAllocation {
+  deckId: string
+  cardId: string
+  mb: number
+  sb: number
+}
+
+// TASK-318 H7: computeDeckSlotOps aggregates ALL related rows' allocations
+// into one total, then reallocates that total onto a SINGLE ownedCardId
+// (collection ?? sale ?? trade ?? wishlist — whichever status comes first).
+// That's correct when there is only one destination row, but when a save
+// migrates MULTIPLE statuses at once (e.g. NM sale x3 + NM trade x2, both
+// allocated to the same deck), the combined 5 landed entirely on the sale
+// row (quantity 3) — 3 fit, the leftover 2 overflowed into a NEW WISHLIST
+// row via allocateCardToDeck's owned/wishlist split, because the sale row
+// itself only ever had 3 copies. The trade allocation was never migrated to
+// the LP trade row at all.
+//
+// This is the per-row alternative: given each row's OWN allocation on a
+// deck (mb/sb) and a map from that row's id to where its identity migrated
+// TO (same status, via idsByStatus), move each row's allocation directly —
+// no aggregation, so nothing can overflow. A row whose mapped id is itself
+// (already at the destination, or no change) is a no-op. Used ONLY when the
+// target total for a deck exactly equals the original total (no allocation
+// edit in the modal) AND the identity changed — see CardDetailModal.vue.
+export const computeDeckMigrationOps = (
+  rows: readonly DeckRowAllocation[],
+  idByCardId: ReadonlyMap<string, string>,
+): DeckSlotOp[] => {
+  const ops: DeckSlotOp[] = []
+  for (const row of rows) {
+    const mappedId = idByCardId.get(row.cardId) ?? row.cardId
+    if (mappedId === row.cardId) continue
+    if (row.mb > 0) {
+      ops.push({ type: 'deallocate', deckId: row.deckId, cardId: row.cardId, isInSideboard: false })
+      ops.push({ type: 'allocate', deckId: row.deckId, cardId: mappedId, quantity: row.mb, isInSideboard: false })
+    }
+    if (row.sb > 0) {
+      ops.push({ type: 'deallocate', deckId: row.deckId, cardId: row.cardId, isInSideboard: true })
+      ops.push({ type: 'allocate', deckId: row.deckId, cardId: mappedId, quantity: row.sb, isInSideboard: true })
+    }
+  }
+  return ops
+}

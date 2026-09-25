@@ -10,9 +10,20 @@ import { type CardHistoryPoint, usePriceHistory } from '../../composables/usePri
 import { useI18n } from '../../composables/useI18n'
 import { type ScryfallCard, searchCards } from '../../services/scryfall'
 import { cleanCardName } from '../../utils/cardHelpers'
-import { buildOriginalBinderSlots, computeBinderSlotOps } from '../../utils/binderSlotDiff'
+import {
+  type BinderRowAllocation,
+  buildOriginalBinderSlots,
+  computeBinderMigrationOps,
+  computeBinderSlotOps,
+} from '../../utils/binderSlotDiff'
 import { type CardIdentity, computeStatusOperations, mergeServerCards } from '../../utils/cardSaveDiff'
-import { buildOriginalSlots, computeDeckSlotOps, type DeckSlot } from '../../utils/deckSlotDiff'
+import {
+  buildOriginalSlots,
+  computeDeckMigrationOps,
+  computeDeckSlotOps,
+  type DeckRowAllocation,
+  type DeckSlot,
+} from '../../utils/deckSlotDiff'
 import BaseButton from '../ui/BaseButton.vue'
 import IconV2 from '../ui/IconV2.vue'
 import BaseModal from '../ui/BaseModal.vue'
@@ -744,6 +755,41 @@ const handleSave = async () => {
       identity.condition !== savedCard.condition ||
       identity.foil !== savedCard.foil
 
+    // TASK-281: none of the writes below reject on failure — deleteCard/
+    // updateCard/deallocateCard resolve to false, addCard to null,
+    // allocateCardToDeck to { allocated: 0, wishlisted: 0 },
+    // allocateCardToBinder to { allocated: 0, failed: true/false }, and
+    // reduceAllocationsForCard (AC4) now to false — so the catch block
+    // below can never see a failed write.
+    // anySucceeded/anyFailed accumulate across every step so we can tell,
+    // at the end, whether to show success, a partial-failure message, or
+    // the generic error — see the anyFailed check near the end.
+    let anySucceeded = false
+    let anyFailed = false
+
+    const newOwnedQty = savedDistribution.collection + savedDistribution.sale + savedDistribution.trade
+
+    // STEP 1: reduce deck allocations if owned drops below allocated (owned
+    // path only). TASK-318 H8: this MUST run before the server reads and
+    // diff-building below (not after, as it did before this fix) — when it
+    // fires, reduceAllocationsForCard can create a NEW wishlist row (for the
+    // excess) with its own allocation. Before this reorder, that row was
+    // created AFTER `existingCardsForSave`/`sourceCardsForDiff` had already
+    // been snapshotted, so STEP 2's diff and the identity migration below
+    // never knew it existed: it was left behind as a stray old-identity row,
+    // and its allocation got summed into the identity-migration total and
+    // reallocated on top of the correctly-sized target — inflating the deck
+    // by exactly that row's quantity. Running STEP 1 first means
+    // collectionStore.cards (read via `existingCardsForSave` right below)
+    // already reflects whatever row it created, so the M3 mechanism further
+    // down picks it up as an ordinary "old-identity row the modal never
+    // showed" and migrates it like any other.
+    if (savedCard.status !== 'wishlist' && newOwnedQty < savedTotalAllocated) {
+      const step1Ok = await decksStore.reduceAllocationsForCard(savedCard, newOwnedQty)
+      if (step1Ok) anySucceeded = true
+      else anyFailed = true
+    }
+
     // TASK-280 AC1: merge a fresh server read into collectionStore.cards
     // before computing the create/update/delete diff. Without this,
     // computeStatusOperations decides purely from memory — the exact gap
@@ -810,8 +856,6 @@ const handleSave = async () => {
     const sourceIdsForDiff = new Set(sourceCardsForDiff.map(c => c.id))
     const destinationOnlyCards = existingCardsForSave.filter(c => isNewPrint(c) && !sourceIdsForDiff.has(c.id))
 
-    const newOwnedQty = savedDistribution.collection + savedDistribution.sale + savedDistribution.trade
-
     // SCRUM-35 D2 / TASK-318 M2: snapshot per-deck (mb, sb) totals BEFORE any
     // mutation, across BOTH the source rows AND any pre-existing destination
     // rows about to be merged into them, so `orig` reflects the FULL truth —
@@ -831,25 +875,6 @@ const handleSave = async () => {
     const destOnlyBinderSlots = buildOriginalBinderSlotsForRelated(destinationOnlyCards)
     const targetDeckSlots = addDeckSlots(deckAllocations.value, destOnlyDeckSlots)
     const targetBinderSlots = addBinderSlots(binderAllocations.value, destOnlyBinderSlots)
-
-    // TASK-281: none of the writes below reject on failure — deleteCard/
-    // updateCard/deallocateCard resolve to false, addCard to null,
-    // allocateCardToDeck to { allocated: 0, wishlisted: 0 },
-    // allocateCardToBinder to { allocated: 0, failed: true/false }, and
-    // reduceAllocationsForCard (AC4) now to false — so the catch block
-    // below can never see a failed write.
-    // anySucceeded/anyFailed accumulate across every step so we can tell,
-    // at the end, whether to show success, a partial-failure message, or
-    // the generic error — see the anyFailed check after STEP 3.5 below.
-    let anySucceeded = false
-    let anyFailed = false
-
-    // STEP 1: reduce deck allocations if owned drops below allocated (owned path only).
-    if (savedCard.status !== 'wishlist' && newOwnedQty < savedTotalAllocated) {
-      const step1Ok = await decksStore.reduceAllocationsForCard(savedCard, newOwnedQty)
-      if (step1Ok) anySucceeded = true
-      else anyFailed = true
-    }
 
     // STEP 2: apply status diff. Strict identity per (scryfallId, edition, condition, foil)
     // with print-relaxed self-heal for legacy duplicates (see cardSaveDiff.ts).
@@ -893,14 +918,68 @@ const handleSave = async () => {
         ...destinationOnlyCards.map(c => c.id),
         ...Object.values(idsByStatus).filter((v): v is string => !!v),
       ]))
-      const slotOps = computeDeckSlotOps({
-        decks: allDecks.value.map(d => ({ deckId: d.id })),
-        originalSlots,
-        targetSlots: targetDeckSlots,
-        relatedCardIds: relatedCardIdsAfterStep2,
-        ownedCardId,
-        identityChanged,
-      })
+
+      // TASK-318 H7: computeDeckSlotOps/computeBinderSlotOps aggregate ALL
+      // related rows' allocations into ONE total per deck/binder, then
+      // reallocate that total onto the SINGLE ownedCardId — correct when
+      // there's one destination row, but a card split across statuses (e.g.
+      // NM sale x3 + NM trade x2, both allocated to the same deck) got its
+      // combined 5 dumped onto just the sale row; the 3 it could hold landed
+      // there and the leftover 2 silently overflowed into a NEW wishlist
+      // row via allocateCardToDeck's owned/wishlist split — the trade row's
+      // allocation was never migrated to the LP trade row at all.
+      //
+      // Fix: for a deck/binder the user did NOT touch in this modal (target
+      // total === original total) AND whose identity changed, migrate each
+      // SOURCE ROW's own allocation directly to that row's own mapped
+      // destination id (same status, via idsByStatus) — no aggregation, so
+      // nothing can overflow. A deck/binder the user DID edit still goes
+      // through the aggregate path below (unchanged) — per-row targets
+      // aren't expressible from the modal's own (already-aggregate) UI
+      // state, so there's no per-row intent to preserve there anyway.
+      const idByCardId = new Map<string, string>()
+      for (const card of allocSourceCards) {
+        // eslint-disable-next-line security/detect-object-injection
+        idByCardId.set(card.id, idsByStatus[card.status] ?? card.id)
+      }
+
+      const uneditedDeckIds = new Set<string>()
+      const editedDecks: { deckId: string }[] = []
+      for (const d of allDecks.value) {
+        const target = targetDeckSlots[d.id] ?? { mb: 0, sb: 0 }
+        const orig = originalSlots.get(d.id) ?? { mb: 0, sb: 0 }
+        if (identityChanged && target.mb === orig.mb && target.sb === orig.sb) {
+          uneditedDeckIds.add(d.id)
+        } else {
+          editedDecks.push({ deckId: d.id })
+        }
+      }
+      const deckMigrationRows: DeckRowAllocation[] = []
+      for (const card of allocSourceCards) {
+        const byDeck = new Map<string, DeckSlot>()
+        for (const a of getAllocationsForCard(card.id)) {
+          if (!uneditedDeckIds.has(a.deckId)) continue
+          const cur = byDeck.get(a.deckId) ?? { mb: 0, sb: 0 }
+          if (a.isInSideboard) cur.sb += a.quantity
+          else cur.mb += a.quantity
+          byDeck.set(a.deckId, cur)
+        }
+        for (const [deckId, slot] of byDeck) {
+          deckMigrationRows.push({ deckId, cardId: card.id, mb: slot.mb, sb: slot.sb })
+        }
+      }
+
+      const slotOps = [
+        ...computeDeckMigrationOps(deckMigrationRows, idByCardId),
+        ...computeDeckSlotOps({
+          decks: editedDecks,
+          originalSlots,
+          targetSlots: targetDeckSlots,
+          relatedCardIds: relatedCardIdsAfterStep2,
+          ownedCardId,
+          identityChanged,
+        }),
+      ]
       for (const op of slotOps) {
         if (op.type === 'deallocate') {
           const ok = await decksStore.deallocateCard(op.deckId, op.cardId, op.isInSideboard)
@@ -921,14 +1000,40 @@ const handleSave = async () => {
       // changed, then re-allocate target qty against ownedCardId. Binders cap at available
       // collection qty internally — STEP 2 already updated collection above, so the cap reflects
       // the new owned total.
-      const binderSlotOps = computeBinderSlotOps({
-        binders: allBinders.value.map(b => ({ binderId: b.id })),
-        originalSlots: originalBinderSlots,
-        targetSlots: targetBinderSlots,
-        relatedCardIds: relatedCardIdsAfterStep2,
-        ownedCardId,
-        identityChanged,
-      })
+      // TASK-318 H7: same per-row migration split as decks above.
+      const uneditedBinderIds = new Set<string>()
+      const editedBinders: { binderId: string }[] = []
+      for (const b of allBinders.value) {
+        const target = targetBinderSlots[b.id] ?? 0
+        const orig = originalBinderSlots.get(b.id) ?? 0
+        if (identityChanged && target === orig) {
+          uneditedBinderIds.add(b.id)
+        } else {
+          editedBinders.push({ binderId: b.id })
+        }
+      }
+      const binderMigrationRows: BinderRowAllocation[] = []
+      for (const card of allocSourceCards) {
+        const byBinder = new Map<string, number>()
+        for (const a of getAllocationsForCard(card.id)) {
+          if (!uneditedBinderIds.has(a.deckId)) continue
+          byBinder.set(a.deckId, (byBinder.get(a.deckId) ?? 0) + a.quantity)
+        }
+        for (const [binderId, quantity] of byBinder) {
+          binderMigrationRows.push({ binderId, cardId: card.id, quantity })
+        }
+      }
+      const binderSlotOps = [
+        ...computeBinderMigrationOps(binderMigrationRows, idByCardId),
+        ...computeBinderSlotOps({
+          binders: editedBinders,
+          originalSlots: originalBinderSlots,
+          targetSlots: targetBinderSlots,
+          relatedCardIds: relatedCardIdsAfterStep2,
+          ownedCardId,
+          identityChanged,
+        }),
+      ]
       for (const op of binderSlotOps) {
         if (op.type === 'deallocate') {
           const ok = await bindersStore.deallocateCard(op.binderId, op.cardId)
@@ -961,11 +1066,24 @@ const handleSave = async () => {
     // savePartialError's old "please check and try again" wording no longer
     // applies, since there is nothing to retry inside this modal); if
     // NOTHING wrote at all, the plain saveError is accurate.
+    //
+    // TASK-318 M-T (4th review round): a create/update failure specifically
+    // (nonDestructiveFailed) is exactly the case addCard/updateCard's own
+    // CARD_WRITE_TIMEOUT_MS wrapping exists for — the write can still LAND
+    // LATE after this function already resolved false/null (TASK-229's own
+    // measured failure mode, TASK-255's whole reason for existing). "Nothing
+    // was saved" (saveError) can be FALSE in that case even when
+    // anySucceeded reads false right now, so a STEP 2 create/update failure
+    // always gets the honest "may not have been saved" wording — never the
+    // more definite saveError. Deletes and STEP 3/3.5 failures (which only
+    // ever occur once every create/update already succeeded, or are
+    // independent deck/binder writes) keep the existing anySucceeded-based
+    // choice.
     if (anyFailed) {
-      toastStore.show(
-        t(anySucceeded ? 'cards.detailModal.saveIncompleteError' : 'cards.detailModal.saveError'),
-        'error',
-      )
+      const errorKey = (nonDestructiveFailed || anySucceeded)
+        ? 'cards.detailModal.saveIncompleteError'
+        : 'cards.detailModal.saveError'
+      toastStore.show(t(errorKey), 'error')
       handleClose()
       return
     }

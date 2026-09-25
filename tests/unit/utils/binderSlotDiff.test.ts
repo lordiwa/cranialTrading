@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildOriginalBinderSlots,
+  type BinderRowAllocation,
+  computeBinderMigrationOps,
   computeBinderSlotOps,
   type BinderSlotOp,
 } from '@/utils/binderSlotDiff'
@@ -155,5 +157,35 @@ describe('computeBinderSlotOps — diff per binder', () => {
       { type: 'deallocate', binderId: 'B1', cardId: 'old-card-id' },
       { type: 'allocate', binderId: 'B1', cardId: 'new-card-id', quantity: 4 },
     ])
+  })
+})
+
+describe('computeBinderMigrationOps — TASK-318 H7: per-row migration, no aggregation', () => {
+  // Regression for R2 (rev4 probe): binder counterpart of the deck bug —
+  // two rows in the same binder used to be merged into one total and
+  // reallocated onto a single destination id.
+  it('migrates each row to its own mapped id, preserving the per-status split', () => {
+    const rows: BinderRowAllocation[] = [
+      { binderId: 'B1', cardId: 'nm-sale', quantity: 3 },
+      { binderId: 'B1', cardId: 'nm-trade', quantity: 2 },
+    ]
+    const idByCardId = new Map([['nm-sale', 'lp-sale'], ['nm-trade', 'lp-trade']])
+    const ops = computeBinderMigrationOps(rows, idByCardId)
+    expect(ops).toEqual<BinderSlotOp[]>([
+      { type: 'deallocate', binderId: 'B1', cardId: 'nm-sale' },
+      { type: 'allocate', binderId: 'B1', cardId: 'lp-sale', quantity: 3 },
+      { type: 'deallocate', binderId: 'B1', cardId: 'nm-trade' },
+      { type: 'allocate', binderId: 'B1', cardId: 'lp-trade', quantity: 2 },
+    ])
+  })
+
+  it('skips a row whose mapped id is itself', () => {
+    const rows: BinderRowAllocation[] = [{ binderId: 'B1', cardId: 'lp-existing', quantity: 2 }]
+    expect(computeBinderMigrationOps(rows, new Map([['lp-existing', 'lp-existing']]))).toEqual([])
+  })
+
+  it('skips a row with zero quantity', () => {
+    const rows: BinderRowAllocation[] = [{ binderId: 'B1', cardId: 'nm', quantity: 0 }]
+    expect(computeBinderMigrationOps(rows, new Map([['nm', 'lp']]))).toEqual([])
   })
 })

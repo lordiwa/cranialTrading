@@ -443,7 +443,43 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     wrapper.unmount()
   })
 
-  it('AC5: a total failure (nothing wrote) shows the generic save-error message, not the partial one', async () => {
+  it('AC5: a total failure with NO STEP 2 write involved (a pure STEP 3 deck-allocation failure) shows the generic save-error message, not the partial one', async () => {
+    // TASK-318 M-T (4th round): the original version of this test drove the
+    // failure through updateCard (a STEP 2 create/update) — but that write
+    // is wrapped in CARD_WRITE_TIMEOUT_MS and can land LATE, so it now
+    // always shows saveIncompleteError (see the new test right below), never
+    // this plain saveError. To keep real coverage of the "genuinely nothing
+    // succeeded" saveError path, this drives the ONLY failure through STEP 3
+    // (deck allocation) instead, with no status/quantity change at all, so
+    // no STEP 2 op runs and nonDestructiveFailed stays false.
+    const card = makeCard({ id: 'card-1', status: 'collection', quantity: 4 })
+    const collectionStore = useCollectionStore()
+    collectionStore.cards = [card] as any
+    const decksStore = useDecksStore()
+    seedDeck(decksStore, [])
+
+    const wrapper = mount(CardDetailModal, { props: { show: true, card }, attachTo: document.body })
+    await flushPromises()
+    decksStore.allocateCardToDeck = vi.fn().mockResolvedValue({ allocated: 0, wishlisted: 0 })
+
+    const buttons = panelButtons('cards.detailModal.assignToDecks')
+    buttons[1]!.click() // MB plus: 0 -> 1 (STEP 3 only, no STEP 2 op)
+    await save()
+
+    const toastStore = useToastStore()
+    const errorToast = toastStore.toasts.find(t => t.type === 'error')
+    expect(errorToast).toBeTruthy()
+    expect(errorToast!.message).toBe('cards.detailModal.saveError')
+
+    wrapper.unmount()
+  })
+
+  it('M-T regression: a STEP 2 update failure shows saveIncompleteError, not saveError, even when NOTHING else succeeded', async () => {
+    // The write addCard/updateCard wrap in CARD_WRITE_TIMEOUT_MS can still
+    // land after this call resolves false — "nothing was saved" (saveError)
+    // would be a claim we cannot actually back up in that case, so a STEP 2
+    // create/update failure always gets the softer "may not have been
+    // saved" wording, regardless of anySucceeded.
     const card = makeCard({ id: 'card-1', status: 'collection', quantity: 4 })
     const collectionStore = useCollectionStore()
     collectionStore.cards = [card] as any
@@ -458,7 +494,7 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     const toastStore = useToastStore()
     const errorToast = toastStore.toasts.find(t => t.type === 'error')
     expect(errorToast).toBeTruthy()
-    expect(errorToast!.message).toBe('cards.detailModal.saveError')
+    expect(errorToast!.message).toBe('cards.detailModal.saveIncompleteError')
 
     wrapper.unmount()
   })

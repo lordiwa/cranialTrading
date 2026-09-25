@@ -27,10 +27,15 @@
       "author": "orchestrator",
       "at": "2026-09-24T22:21:59.613Z",
       "body": "Wrecker 2026-09-24 marco este ticket como BLOQUEADO por WG-CRANIAL-LIVE-003 (\"no hay panel de vendedor\"). LIVE-003 es FALSO POSITIVO: los pedidos estan en /saved-matches, pestana SOLICITUDES (SavedMatchesView.vue, enlace en AppHeader.vue:489), con \"Marcar como vendida\". LEIDO. Este ticket SI es verificable por UI.\n\nAdemas, 9cd8828 (TASK-307/316, en develop, NO en prod v1.59.14) agrega syncFulfilledCardsPostCommit, que post-sincroniza card_index/public_cards despues de fulfillRequest. Es probable que cubra parte de este ticket (SUPUESTO, no verificado). Antes de trabajarlo: medir contra dev si tras cumplir un pedido la vitrina baja el stock. Si baja, este ticket se cierra por 9cd8828; si no, queda la parte que falte."
+    },
+    {
+      "author": "wrecker",
+      "at": "2026-09-25T00:56:24.585Z",
+      "body": "[WARGAMING] UC-28 cumplir pedido -> propagacion al indice publico. /saved-matches SOLICITUDES -> \"Marcar como vendida\"; luego /@qa_tcg. QA (Wrecker), MEDIDO en prod v1.59.14, cuenta qa@, sesion 3 2026-09-24.\n\nDesbloqueado: el panel de vendedor SI existe (nuestro LIVE-003 era falso positivo). Marcar \"QA Wrecker\" (2x Rockalanche NM) como VENDIDA: la coleccion PRIVADA descuenta bien (NM x5->x3, Cartas 15->13, En venta $5.25->$4.55), PERO el PERFIL PUBLICO /@qa_tcg sigue anunciando NM x5.\n\nDescartada cache de cliente: el perfil lee en vivo de Firestore (Listen/channel -> 200; en localStorage solo cranial_snapshot_date / cranial_card_snapshot_date, sin indice cacheado). El desync es server-side: card_index / public_cards no se actualiza tras la venta. Coincide con lo que este ticket describe y con el fix 9cd8828 de develop (no desplegado en prod). Reporte QA: https://claude.ai/artifact/DdMzHtvAvSYpBVUCBxS7LD"
     }
   ],
   "created_at": "2026-09-19T17:29:02.895Z",
-  "updated_at": "2026-09-24T22:21:59.613Z",
+  "updated_at": "2026-09-25T00:56:24.585Z",
   "jira_key": null,
   "verification_tier": "tests-after"
 }

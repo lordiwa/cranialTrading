@@ -34,10 +34,15 @@
       "author": "orchestrator",
       "at": "2026-08-24T23:19:01.154Z",
       "body": "Cerrado con review PASS en la ronda 2. review_depth full; inputs del rubro: 541 lineas cambiadas en la ronda 1 (umbral 150), logica core de tier tdd en CardDetailModal.vue y decks.ts, y cambio de firma publica de store.\n\nDos commits: 268fe1e (handleSave y applyStatusOperations propagan anySucceeded/anyFailed, no emiten saved/close ante fallo, reduceAllocationsForCard pasa a Promise<boolean>, clave savePartialError en los 3 locales) y 8efaafc (el HIGH-1 de la ronda 1: allocateCardToBinder devuelve {allocated, failed} para separar el tope de disponibilidad del fallo real, mas el MEDIUM-2).\n\nPOR QUE IMPORTABA: TASK-280 agravo este defecto sin querer. Al ponerle techo de 20s a las escrituras, un cuelgue de red dejo de trabar el boton y paso a terminar devolviendo false, que este codigo leia como exito. Un sintoma visible convertido en uno invisible. Y esta MEDIDO en produccion el 2026-08-24 que ese techo se alcanza de verdad en una cuenta de 5765 cartas, asi que no era un camino teorico.\n\nDECISION AC4: opcion (a), reduceAllocationsForCard pasa de Promise<void> a Promise<boolean>. Razon: tiene un solo caller real (medido por grep), y dejarla muda la volvia la unica excepcion silenciosa frente al chequeo de AC2. Documentada en codigo en decks.ts.\n\nERROR DEL TICKET, registrado para que no se repita: los ACs afirmaban Promise<boolean> para allocateCardToDeck y allocateCardToBinder, y era falso — devuelven {allocated, wishlisted} y number respectivamente. El orquestador lo escribio sin verificar las firmas. El developer uso las formas reales y el reviewer lo corrigio. Es el mismo modo de fallo que la leccion del 2026-08-21: algo LEIDO citado como MEDIDO.\n\nAC6 medido por el orquestador sobre el arbol final, no por el developer: npm run test:unit 2293/2293 en 178 archivos, npx vite build verde, y npm run type-check limpio corrido por el reviewer (vite build no type-checkea).\n\nPENDIENTE: no desplegado todavia. Falta bump de version, suite E2E completa y push.\n\nResiduos derivados: TASK-283 (las stores de mazos reportan exito ante escrituras fallidas y colapsan exito parcial en un boolean; incluye la ambiguedad tope-vs-fallo que sigue viva en useDiscoveryAddCard.ts:174 y AddCardModal.vue:306) y TASK-284 (doble toast de error)."
+    },
+    {
+      "author": "orchestrator",
+      "at": "2026-09-25T01:19:21.535Z",
+      "body": "AC3 REEMPLAZADO (2026-09-24) por la decision de Mato en TASK-318 (\"nunca borrar despues de un fallo\"): ante cualquier fallo el modal de detalle de carta se CIERRA con un aviso honesto y ya no hay reintento dentro del modal, asi que \"reintentar sin perder lo escrito\" deja de aplicar. Siguen vigentes y con test las protecciones centrales de este ticket: ningun toast de exito ante un fallo, toast de error, 'saved' no se emite y el mensaje de guardado incompleto es distinto (AC1/2/5). Los tests de CardDetailModal.saveResult.test.ts se ajustaron en el commit 6347b02; lo verifico un reviewer en contexto fresco."
     }
   ],
   "created_at": "2026-08-24T22:24:23.567Z",
-  "updated_at": "2026-08-24T23:19:01.154Z",
+  "updated_at": "2026-09-25T01:19:21.535Z",
   "jira_key": null,
   "verification_tier": "tdd"
 }

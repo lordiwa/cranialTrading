@@ -21,9 +21,15 @@
   "depends_on": [],
   "linked_commits": [],
   "linked_prs": [],
-  "comments": [],
+  "comments": [
+    {
+      "author": "wrecker",
+      "at": "2026-09-25T00:56:24.585Z",
+      "body": "[WARGAMING] UC-05 buscar -> landing /inicio y /search. QA (Wrecker), MEDIDO en prod v1.59.14, sesion 3 2026-09-24.\n\nAmpliacion: no es solo el autocomplete. Al pulsar Enter (busqueda real) con el termino que Scryfall rechaza (<img src=x onerror=alert(1)>): GET api.scryfall.com/cards/search?q=\"...\" -is:preview -> 503, y la consola muestra un SEGUNDO error tragado ademas del de sugerencias: \"Error en searchAdvancedWithMeta: TypeError: Failed to fetch\" (FilterPanel), junto con \"Error en getCardSuggestions\" (GlobalSearch.vue). La pantalla de resultados no muestra error ni \"0 resultados\" -> muda.\n\nNo es XSS (el termino se refleja como texto). Severidad baja, coincidimos. Reporte QA: https://claude.ai/artifact/DdMzHtvAvSYpBVUCBxS7LD"
+    }
+  ],
   "created_at": "2026-09-24T22:21:48.637Z",
-  "updated_at": "2026-09-24T22:21:48.637Z",
+  "updated_at": "2026-09-25T00:56:24.585Z",
   "jira_key": null,
   "verification_tier": "tests-after",
   "requires_uat": true,

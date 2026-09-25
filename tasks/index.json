@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-24T22:22:18.969Z",
+  "generated_at": "2026-09-25T01:19:21.535Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1786,7 +1786,7 @@
     {
       "key": "TASK-318",
       "title": "Cambiar la condicion (o foil / impresion) de una carta en el detalle DUPLICA el stock: crea una fila nueva y deja la original intacta",
-      "status": "todo",
+      "status": "in_review",
       "priority": "high"
     },
     {

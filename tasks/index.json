@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-25T01:19:21.535Z",
+  "generated_at": "2026-09-25T01:54:03.561Z",
   "tasks": [
     {
       "key": "TASK-003",
@@ -1794,6 +1794,12 @@
       "title": "El autocompletado del buscador no distingue \"Scryfall fallo\" de \"sin coincidencias\": getCardSuggestions traga el error",
       "status": "todo",
       "priority": "low"
+    },
+    {
+      "key": "TASK-320",
+      "title": "Editar el total de un mazo o carpeta en el detalle de una carta repartida en varios estados la vacia o la desborda a wishlist",
+      "status": "todo",
+      "priority": "medium"
     }
   ]
 }

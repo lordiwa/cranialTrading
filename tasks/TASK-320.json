@@ -1,0 +1,33 @@
+{
+  "key": "TASK-320",
+  "title": "Editar el total de un mazo o carpeta en el detalle de una carta repartida en varios estados la vacia o la desborda a wishlist",
+  "description": "ORIGEN: quinta revision de TASK-318 (2026-09-25), hallazgo MEDIUM-1, MEDIDO con el modal y los stores reales (Firestore mockeado). Probes en el scratchpad de la sesion (rev5). Fuera del alcance aprobado de TASK-318 (el caso 7 no edita el mazo).\n\nDEFECTO PREVIO A TASK-318 (existe tambien en 8980f01): el camino \"agregado\" de asignaciones (computeDeckSlotOps / computeBinderSlotOps, CardDetailModal.vue:946-982 y :1004-1036) suma todas las filas de la carta en un total por mazo/carpeta y lo reasigna a UNA sola fila.\n- N5c, SIN cambiar la condicion: NM venta 3 + NM cambio 2, ambas en el mazo D1; bajar D1 de 5 a 4 -> el mazo queda VACIO, con toast de error. Igual en 9285bbf, 6347b02 y 8980f01.\n- N5, con cambio a LP: aparece una fila LP wishlist x1 nueva; D1 = venta 3 + wishlist 1 teniendo 2 LP cambio propias. Toast \"updated\".\n- N5b, carpeta: queda recortada a venta 3 en silencio.\n\nRelacionado: TASK-318-H7 se arreglo solo para mazos/carpetas que el usuario NO edita (migracion por fila, computeDeckMigrationOps/computeBinderMigrationOps).\n\nCASOS DE USO: pendientes de redactar y aprobar por Mato.",
+  "acceptance_criteria": [
+    "Bajar o subir el total de un mazo en el detalle de una carta repartida en varios estados deja el mazo con el total pedido, repartido entre las filas propias, sin crear filas wishlist mientras haya copias propias disponibles.",
+    "Lo mismo para carpetas, sin recortes silenciosos.",
+    "Lo mismo combinado con un cambio de condicion.",
+    "Test de regresion de N5c que falla contra el codigo actual."
+  ],
+  "status": "todo",
+  "priority": "medium",
+  "labels": [
+    "bug",
+    "decks",
+    "binders",
+    "collection"
+  ],
+  "assignee": null,
+  "depends_on": [
+    "TASK-318"
+  ],
+  "linked_commits": [],
+  "linked_prs": [],
+  "comments": [],
+  "created_at": "2026-09-25T01:54:03.561Z",
+  "updated_at": "2026-09-25T01:54:03.561Z",
+  "jira_key": null,
+  "verification_tier": "tests-after",
+  "requires_uat": true,
+  "marker": "[EXPLICIT]",
+  "source_tier": "T1"
+}

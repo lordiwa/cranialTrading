@@ -549,6 +549,11 @@ const applyStatusOperations = async (
   ops: ReturnType<typeof computeStatusOperations>,
   cardData: { name: string; scryfallId: string; edition: string; setCode: string; image: string; price: number; condition: CardCondition; foil: boolean; isPublic: boolean },
   existingCards: Card[],
+  // TASK-318 LOW-1 (5th review round): true when STEP 1 (reduceAllocationsForCard,
+  // runs before this) already failed. Treated exactly like a create/update
+  // failure discovered IN this function — no delete runs, and the returned
+  // nonDestructiveFailed also tells the caller to skip STEP 3/3.5.
+  skipDeletes = false,
 ): Promise<{ idsByStatus: Record<CardStatus, string | null>; anySucceeded: boolean; anyFailed: boolean; nonDestructiveFailed: boolean }> => {
   const idsByStatus: Record<CardStatus, string | null> = { collection: null, sale: null, trade: null, wishlist: null }
   let anySucceeded = false
@@ -609,8 +614,11 @@ const applyStatusOperations = async (
   // TASK-318: `anyFailed` at this point reflects ONLY the create/update
   // pass above — exactly what "never delete after a failure" needs to gate
   // on. Captured before the delete loop (which may add its own failures)
-  // so the caller can tell the two apart.
-  const nonDestructiveFailed = anyFailed
+  // so the caller can tell the two apart. TASK-318 LOW-1: folds in
+  // `skipDeletes` (a STEP 1 failure) too, since the caller's STEP 3/3.5 gate
+  // reads this SAME returned flag — one signal for both "don't delete here"
+  // and "don't migrate deck/binder allocations after this returns".
+  const nonDestructiveFailed = anyFailed || skipDeletes
 
   if (!nonDestructiveFailed) {
     for (const op of destructiveOps) {
@@ -784,10 +792,17 @@ const handleSave = async () => {
     // already reflects whatever row it created, so the M3 mechanism further
     // down picks it up as an ordinary "old-identity row the modal never
     // showed" and migrates it like any other.
+    // TASK-318 LOW-1 (5th review round): if STEP 1's own write fails, treat
+    // it the same as a STEP 2 create/update failure — no deletes, no STEP
+    // 3/3.5 migration, just the honest toast and close. STEP 1 can already
+    // have partially moved allocations to a wishlist row it half-wrote; running
+    // the identity migration/deletes on top of that unverified state risks
+    // exactly the kind of loss "never delete after a failure" exists to avoid.
+    let step1Failed = false
     if (savedCard.status !== 'wishlist' && newOwnedQty < savedTotalAllocated) {
       const step1Ok = await decksStore.reduceAllocationsForCard(savedCard, newOwnedQty)
       if (step1Ok) anySucceeded = true
-      else anyFailed = true
+      else { anyFailed = true; step1Failed = true }
     }
 
     // TASK-280 AC1: merge a fresh server read into collectionStore.cards
@@ -843,6 +858,28 @@ const handleSave = async () => {
       distributionForDiff[c.status] += c.quantity
     }
 
+    // TASK-318 H9 (5th review round): STEP 1 (above) can INCREMENT an
+    // EXISTING wishlist row's quantity in place (ensureCollectionWishlistCard
+    // adds to `existing.quantity`, ../stores/collection.ts) when a same-
+    // identity wishlist row already existed. That row was ALREADY in
+    // savedRelatedCards (savedDistribution.wishlist already counted its
+    // PRE-STEP-1 quantity), so it's excluded from sourceExtraCards above —
+    // but distributionForDiff.wishlist still only carries the pre-STEP-1
+    // number. Without this, STEP 2's diff target keeps the stale value and
+    // writes the row's quantity right back down, discarding what STEP 1 just
+    // added — while the deck allocation STEP 1 itself set stays at the
+    // HIGHER number, leaving the deck allocated for more than the card's own
+    // quantity. Fold in only the DELTA a wishlist row already known to the
+    // modal actually gained (never counted twice: a row STEP 1 newly
+    // CREATES is a different id, already covered by sourceExtraCards above).
+    for (const c of savedRelatedCards) {
+      if (c.status !== 'wishlist') continue
+      const nowCard = existingCardsForSave.find(fc => fc.id === c.id)
+      if (nowCard && nowCard.quantity > c.quantity) {
+        distributionForDiff.wishlist += nowCard.quantity - c.quantity
+      }
+    }
+
     // TASK-318 M2: rows already sitting at the NEW identity that are NOT
     // part of sourceCardsForDiff (case 4's "LP x2 already for sale") have
     // their OWN deck/binder allocations — allocations the modal never
@@ -884,7 +921,7 @@ const handleSave = async () => {
     // distributionForDiff instead of savedDistribution so their quantity isn't lost).
     const ops = computeStatusOperations(distributionForDiff, identity, existingCardsForSave, sourceCardsForDiff)
     const { idsByStatus, anySucceeded: step2Succeeded, anyFailed: step2Failed, nonDestructiveFailed } =
-      await applyStatusOperations(ops, cardData, existingCardsForSave)
+      await applyStatusOperations(ops, cardData, existingCardsForSave, step1Failed)
     if (step2Succeeded) anySucceeded = true
     if (step2Failed) anyFailed = true
 

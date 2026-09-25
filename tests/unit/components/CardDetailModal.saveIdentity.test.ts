@@ -967,3 +967,268 @@ describe('CardDetailModal — TASK-318 identity-change failure handling (never d
     wrapper.unmount()
   })
 })
+
+// ────────────────────────────────────────────────────────────────────────────
+// TASK-318 5th review round (H9, LOW-1, LOW-3): a card + an EXISTING wishlist
+// row of the same identity, reduced below what's allocated. STEP 1's own
+// mechanics (ensureCollectionWishlistCard INCREMENTS that existing row) were
+// invisible to distributionForDiff (H9's fix), and STEP 1 failing didn't gate
+// deletes/migration the way a STEP 2 failure does (LOW-1's fix).
+// ────────────────────────────────────────────────────────────────────────────
+describe('CardDetailModal — TASK-318 H9/LOW-1/LOW-3 (STEP 1 + existing wishlist row)', () => {
+  it('N1 regression: NO identity change, reducing owned below what\'s allocated increments an EXISTING wishlist row correctly (card quantity matches deck allocation)', async () => {
+    mockGetDocs.mockResolvedValue({ empty: true, docs: [] })
+
+    const collectionStore = useCollectionStore()
+    const nmSale = makeCard({
+      id: 'nms', scryfallId: 'sf-n1', edition: 'Set', setCode: 'SET',
+      condition: 'NM', foil: false, status: 'sale', quantity: 5,
+    })
+    const nmWishlist = makeCard({
+      id: 'nmw', scryfallId: 'sf-n1', edition: 'Set', setCode: 'SET',
+      condition: 'NM', foil: false, status: 'wishlist', quantity: 1,
+    })
+    collectionStore.cards = [nmSale, nmWishlist] as any
+
+    const decksStore = useDecksStore()
+    decksStore.decks = [{
+      id: 'D1', userId: 'test-user-id', name: 'Deck1', format: 'standard',
+      description: '', colors: [], thumbnail: '',
+      allocations: [{ cardId: 'nms', quantity: 5, isInSideboard: false, addedAt: new Date() }],
+      wishlist: [],
+      stats: { totalCards: 5, ownedCards: 5, totalPrice: 0, avgPrice: 0, sideboardCards: 0, wishlistCards: 0, completionPercentage: 100 },
+      isPublic: false, createdAt: new Date(), updatedAt: new Date(),
+    }] as any
+
+    const wrapper = mount(CardDetailModal, { props: { show: true, card: nmSale }, attachTo: document.body })
+    await flushPromises()
+
+    // sale 5 -> 3: newOwnedQty(3) < savedTotalAllocated(5) triggers STEP 1,
+    // which increments the EXISTING nmw row (1 -> 1+2=3... but only 2
+    // actually needs to move: 5-3=2 excess) by ensureCollectionWishlistCard.
+    await clickInRow('qty-row-sale', 0, 2)
+
+    const saveButton = findButtonByText('common.actions.save')
+    saveButton!.click()
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 300))
+    await flushPromises()
+
+    // The regression this locks: before the H9 fix, distributionForDiff.wishlist
+    // still carried the PRE-STEP-1 snapshot (1), so STEP 2's diff wrote nmw's
+    // quantity back down to 1 even though STEP 1 had already bumped it to 3
+    // (1 original + 2 converted from the deck's excess) — silently discarding
+    // the 2 STEP 1 had just added.
+    const finalCards = collectionStore.cards as unknown as Card[]
+    const finalWishlist = finalCards.filter(c => c.scryfallId === 'sf-n1' && c.status === 'wishlist')
+    expect(finalWishlist).toHaveLength(1)
+    expect(finalWishlist[0]).toMatchObject({ id: 'nmw', quantity: 3 })
+    const finalSale = finalCards.filter(c => c.scryfallId === 'sf-n1' && c.status === 'sale')
+    expect(finalSale).toHaveLength(1)
+    expect(finalSale[0]).toMatchObject({ quantity: 3 })
+
+    const deck = decksStore.decks.find(d => d.id === 'D1')
+    const deckByCard = new Map((deck?.allocations ?? []).map(a => [a.cardId, a.quantity]))
+    expect(deckByCard.get('nms')).toBe(3)
+    // nmw's deck allocation is the CONVERTED portion (2, moved off nms by
+    // STEP 1), not nmw's full card quantity (3) — nmw already held 1 unit of
+    // free (non-deck) wishlist stock before this save, untouched by STEP 1.
+    expect(deckByCard.get('nmw')).toBe(2)
+
+    expect(toastMessages()).toContain('cards.detailModal.updated')
+    expect(wrapper.emitted('close')).toBeTruthy()
+
+    wrapper.unmount()
+  })
+
+  it('N1b regression: SAME as N1 but WITH an identity change (NM -> LP) — the migrated wishlist row still matches its deck allocation', async () => {
+    mockGetDocs.mockResolvedValue({ empty: true, docs: [] })
+
+    const collectionStore = useCollectionStore()
+    const nmSale = makeCard({
+      id: 'nms', scryfallId: 'sf-n1b', edition: 'Set', setCode: 'SET',
+      condition: 'NM', foil: false, status: 'sale', quantity: 5,
+    })
+    const nmWishlist = makeCard({
+      id: 'nmw', scryfallId: 'sf-n1b', edition: 'Set', setCode: 'SET',
+      condition: 'NM', foil: false, status: 'wishlist', quantity: 1,
+    })
+    collectionStore.cards = [nmSale, nmWishlist] as any
+
+    const decksStore = useDecksStore()
+    decksStore.decks = [{
+      id: 'D1', userId: 'test-user-id', name: 'Deck1', format: 'standard',
+      description: '', colors: [], thumbnail: '',
+      allocations: [{ cardId: 'nms', quantity: 5, isInSideboard: false, addedAt: new Date() }],
+      wishlist: [],
+      stats: { totalCards: 5, ownedCards: 5, totalPrice: 0, avgPrice: 0, sideboardCards: 0, wishlistCards: 0, completionPercentage: 100 },
+      isPublic: false, createdAt: new Date(), updatedAt: new Date(),
+    }] as any
+
+    const wrapper = mount(CardDetailModal, { props: { show: true, card: nmSale }, attachTo: document.body })
+    await flushPromises()
+    await setCondition('LP')
+    await clickInRow('qty-row-sale', 0, 2)
+
+    const saveButton = findButtonByText('common.actions.save')
+    saveButton!.click()
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 300))
+    await flushPromises()
+
+    // No old-identity (NM) row survives, and the migrated LP wishlist row's
+    // own quantity correctly includes STEP 1's contribution (not just the
+    // stale pre-STEP-1 snapshot).
+    const finalCards = collectionStore.cards as unknown as Card[]
+    const finalForPrint = finalCards.filter(c => c.scryfallId === 'sf-n1b')
+    expect(finalForPrint.every(c => c.condition === 'LP')).toBe(true)
+    const finalWishlist = finalForPrint.filter(c => c.status === 'wishlist')
+    expect(finalWishlist).toHaveLength(1)
+    expect(finalWishlist[0].quantity).toBe(3)
+    const finalSale = finalForPrint.filter(c => c.status === 'sale')
+    expect(finalSale).toHaveLength(1)
+    expect(finalSale[0].quantity).toBe(3)
+
+    const deck = decksStore.decks.find(d => d.id === 'D1')
+    const deckByCard = new Map((deck?.allocations ?? []).map(a => [a.cardId, a.quantity]))
+    expect(deckByCard.get(finalSale[0]!.id)).toBe(3)
+    // The wishlist row's deck allocation is the CONVERTED portion (2, moved
+    // off the sale row by STEP 1), not its full migrated card quantity (3) —
+    // it already held 1 unit of free (non-deck) wishlist stock beforehand.
+    expect(deckByCard.get(finalWishlist[0]!.id)).toBe(2)
+    expect(deck?.allocations.every(a => {
+      const c = finalCards.find(fc => fc.id === a.cardId)
+      return c?.condition === 'LP'
+    })).toBe(true)
+
+    expect(toastMessages()).toContain('cards.detailModal.updated')
+    expect(wrapper.emitted('close')).toBeTruthy()
+
+    wrapper.unmount()
+  })
+
+  it('N1d regression: two successive reductions across separate opens keep the wishlist row\'s quantity in sync with its deck allocation', async () => {
+    mockGetDocs.mockResolvedValue({ empty: true, docs: [] })
+
+    const collectionStore = useCollectionStore()
+    const nmSale = makeCard({
+      id: 'nms', scryfallId: 'sf-n1d', edition: 'Set', setCode: 'SET',
+      condition: 'NM', foil: false, status: 'sale', quantity: 5,
+    })
+    collectionStore.cards = [nmSale] as any
+
+    const decksStore = useDecksStore()
+    decksStore.decks = [{
+      id: 'D1', userId: 'test-user-id', name: 'Deck1', format: 'standard',
+      description: '', colors: [], thumbnail: '',
+      allocations: [{ cardId: 'nms', quantity: 5, isInSideboard: false, addedAt: new Date() }],
+      wishlist: [],
+      stats: { totalCards: 5, ownedCards: 5, totalPrice: 0, avgPrice: 0, sideboardCards: 0, wishlistCards: 0, completionPercentage: 100 },
+      isPublic: false, createdAt: new Date(), updatedAt: new Date(),
+    }] as any
+
+    // First open: sale 5 -> 3 (no existing wishlist row yet; STEP 1 creates one).
+    let wrapper = mount(CardDetailModal, { props: { show: true, card: nmSale }, attachTo: document.body })
+    await flushPromises()
+    await clickInRow('qty-row-sale', 0, 2)
+    findButtonByText('common.actions.save')!.click()
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 300))
+    await flushPromises()
+    wrapper.unmount()
+    document.body.innerHTML = ''
+
+    let finalCards = collectionStore.cards as unknown as Card[]
+    const afterFirst = finalCards.find(c => c.scryfallId === 'sf-n1d' && c.status === 'sale')!
+    expect(afterFirst.quantity).toBe(3)
+
+    // Second open (fresh mount, fresh initializeForm snapshot — no in-modal
+    // retry involved): sale 3 -> 2. STEP 1 fires AGAIN and increments the
+    // EXISTING wishlist row created by the first save.
+    wrapper = mount(CardDetailModal, { props: { show: true, card: afterFirst }, attachTo: document.body })
+    await flushPromises()
+    expect(qtyText('qty-row-sale')).toBe('3')
+    expect(qtyText('qty-row-wishlist')).toBe('2')
+    await clickInRow('qty-row-sale', 0, 1)
+
+    findButtonByText('common.actions.save')!.click()
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 300))
+    await flushPromises()
+
+    // The regression this locks: before the H9 fix, the second save's diff
+    // wrote the wishlist row's quantity back down to its pre-STEP-1 value (2)
+    // even though STEP 1 had already bumped it to 3 — leaving the deck
+    // allocated for one more copy of the wishlist row than the card had.
+    finalCards = collectionStore.cards as unknown as Card[]
+    const finalSale = finalCards.find(c => c.scryfallId === 'sf-n1d' && c.status === 'sale')!
+    const finalWishlist = finalCards.find(c => c.scryfallId === 'sf-n1d' && c.status === 'wishlist')!
+    expect(finalSale.quantity).toBe(2)
+    expect(finalWishlist.quantity).toBe(3)
+
+    const deck = decksStore.decks.find(d => d.id === 'D1')
+    const deckByCard = new Map((deck?.allocations ?? []).map(a => [a.cardId, a.quantity]))
+    expect(deckByCard.get(finalSale.id)).toBe(2)
+    expect(deckByCard.get(finalWishlist.id)).toBe(3)
+
+    wrapper.unmount()
+  })
+
+  it('N9 regression (case 3, print/edition change): confirmed editable via the print selector — one row at the NEW print, deck follows', async () => {
+    mockGetDocs.mockResolvedValue({ empty: true, docs: [] })
+    const { searchCards } = await import('@/services/scryfall')
+    ;(searchCards as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue([
+      { id: 'sf-n9-old', name: 'X', set_name: 'Set', set: 'set', prices: { usd: '1' }, image_uris: { normal: 'a' } },
+      { id: 'sf-n9-new', name: 'X', set_name: 'Other Set', set: 'oth', prices: { usd: '2' }, image_uris: { normal: 'b' } },
+    ])
+
+    const collectionStore = useCollectionStore()
+    const nmCard = makeCard({
+      id: 'nms', scryfallId: 'sf-n9-old', edition: 'Set', setCode: 'SET',
+      condition: 'NM', foil: false, status: 'sale', quantity: 5,
+    })
+    collectionStore.cards = [nmCard] as any
+
+    const decksStore = useDecksStore()
+    decksStore.decks = [{
+      id: 'D1', userId: 'test-user-id', name: 'Deck1', format: 'standard',
+      description: '', colors: [], thumbnail: '',
+      allocations: [{ cardId: 'nms', quantity: 3, isInSideboard: false, addedAt: new Date() }],
+      wishlist: [],
+      stats: { totalCards: 3, ownedCards: 3, totalPrice: 0, avgPrice: 0, sideboardCards: 0, wishlistCards: 0, completionPercentage: 100 },
+      isPublic: false, createdAt: new Date(), updatedAt: new Date(),
+    }] as any
+
+    const wrapper = mount(CardDetailModal, { props: { show: true, card: nmCard }, attachTo: document.body })
+    await flushPromises()
+
+    // LOW-3: confirmed editable in this build — the print selector renders
+    // whenever a card has more than one available printing.
+    const printSelect = document.querySelector('#detail-print-select') as HTMLSelectElement | null
+    expect(printSelect).toBeTruthy()
+    printSelect!.value = 'sf-n9-new'
+    printSelect!.dispatchEvent(new Event('change'))
+    await nextTick()
+
+    findButtonByText('common.actions.save')!.click()
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 300))
+    await flushPromises()
+
+    const finalCards = collectionStore.cards as unknown as Card[]
+    const oldPrintRows = finalCards.filter(c => c.scryfallId === 'sf-n9-old')
+    const newPrintRows = finalCards.filter(c => c.scryfallId === 'sf-n9-new')
+    expect(oldPrintRows).toHaveLength(0)
+    expect(newPrintRows).toHaveLength(1)
+    expect(newPrintRows[0]).toMatchObject({ edition: 'Other Set', quantity: 5 })
+
+    const deck = decksStore.decks.find(d => d.id === 'D1')
+    expect(deck?.allocations).toHaveLength(1)
+    expect(deck?.allocations[0]).toMatchObject({ cardId: newPrintRows[0]!.id, quantity: 3 })
+
+    expect(toastMessages()).toContain('cards.detailModal.updated')
+    expect(wrapper.emitted('close')).toBeTruthy()
+
+    wrapper.unmount()
+  })
+})

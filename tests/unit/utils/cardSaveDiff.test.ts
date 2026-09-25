@@ -118,9 +118,11 @@ describe('computeStatusOperations — grouped multi-status changes', () => {
       ident(),
       cards,
     )
+    // TASK-318 M1 (global): every create/update — across ALL statuses —
+    // before any delete, so the delete's cardId comes last in the array.
     expect(ops).toEqual([
-      { type: 'delete', status: 'collection', cardId: 'a', quantity: 0 },
       { type: 'create', status: 'sale', quantity: 1 },
+      { type: 'delete', status: 'collection', cardId: 'a', quantity: 0 },
     ])
   })
 
@@ -131,11 +133,12 @@ describe('computeStatusOperations — grouped multi-status changes', () => {
       ident(),
       cards,
     )
+    // TASK-318 M1 (global): all 3 creates before the 1 delete.
     expect(ops).toEqual([
-      { type: 'delete', status: 'collection', cardId: 'a', quantity: 0 },
       { type: 'create', status: 'sale', quantity: 1 },
       { type: 'create', status: 'trade', quantity: 1 },
       { type: 'create', status: 'wishlist', quantity: 1 },
+      { type: 'delete', status: 'collection', cardId: 'a', quantity: 0 },
     ])
   })
 

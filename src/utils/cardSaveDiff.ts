@@ -103,20 +103,24 @@ export const buildOriginalDistribution = (
 // destination-identity quantity that ISN'T part of sourceCards (case: destination
 // already had its own stock, e.g. LP x2 for sale before the move) is added on top so a
 // merge into an existing row doesn't clobber what was already there.
-// TASK-318 M1: within a status, creates/updates are emitted BEFORE deletes.
-// Applying deletes first meant that if the delete of the old row succeeded
-// but the create/update of the new one then failed (e.g. Firestore write
+// TASK-318 M1 (fixed GLOBALLY in the 2nd review round — the first fix only
+// ordered within a single status): every create/update across ALL statuses
+// is emitted BEFORE any delete, not just before the delete of that SAME
+// status. Applying deletes first — or deletes from an EARLIER status before
+// a LATER status' create — meant that if the delete succeeded but the
+// create/update that was still to come then failed (e.g. Firestore write
 // timeout), the cards and their deck/binder allocations were gone with
 // nothing left to point at — worse than "at worst the previous state
-// intact" (case 8). Non-destructive ops first means a failure at the delete
-// step (applied last) leaves both rows alive; a caller can always retry.
+// intact" (case 8). All non-destructive ops first, globally, means a
+// failure at ANY delete (all of them applied last) leaves every row alive.
 export const computeStatusOperations = (
   newDistribution: StatusDistribution,
   identity: CardIdentity,
   existingCards: readonly Card[],
   sourceCards: readonly Card[] = [],
 ): CardOperation[] => {
-  const ops: CardOperation[] = []
+  const nonDestructiveOps: CardOperation[] = []
+  const destructiveOps: CardOperation[] = []
   for (const status of STATUS_ORDER) {
     const destMatches = findPrintMatches(existingCards, status, identity)
     const sourceRows = sourceCards.filter(c => c.status === status)
@@ -145,26 +149,25 @@ export const computeStatusOperations = (
 
     if (target <= 0) {
       for (const d of toDelete.values()) {
-        ops.push({ type: 'delete', status, cardId: d.id, quantity: 0 })
+        destructiveOps.push({ type: 'delete', status, cardId: d.id, quantity: 0 })
       }
-      if (canonical) ops.push({ type: 'delete', status, cardId: canonical.id, quantity: 0 })
+      if (canonical) destructiveOps.push({ type: 'delete', status, cardId: canonical.id, quantity: 0 })
       continue
     }
 
     if (canonical) {
       const needsEditionFix = canonical.edition !== identity.edition
       if (canonical.quantity !== target || needsEditionFix) {
-        ops.push({ type: 'update', status, cardId: canonical.id, quantity: target })
+        nonDestructiveOps.push({ type: 'update', status, cardId: canonical.id, quantity: target })
       }
     } else {
-      ops.push({ type: 'create', status, quantity: target })
+      nonDestructiveOps.push({ type: 'create', status, quantity: target })
     }
 
-    // M1: deletes last — by the time these run, the target row already
-    // holds the full merged quantity (create/update above already applied).
     for (const d of toDelete.values()) {
-      ops.push({ type: 'delete', status, cardId: d.id, quantity: 0 })
+      destructiveOps.push({ type: 'delete', status, cardId: d.id, quantity: 0 })
     }
   }
-  return ops
+  // M1: every delete — from every status — runs after every create/update.
+  return [...nonDestructiveOps, ...destructiveOps]
 }

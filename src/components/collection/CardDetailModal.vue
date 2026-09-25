@@ -332,25 +332,43 @@ const showPublicOption = computed(() => {
 // superseded it, so a stale response can never clobber whatever is current.
 let initOpenToken = 0
 
-// TASK-318 H1: rows this modal session has already created/updated onto the
-// NEW identity (idsByStatus from a PREVIOUS handleSave attempt in this same
-// open — the modal stays open on a partial failure, retried by the same
-// SAVE click). Without tracking this, a retry's "pre-existing destination
-// stock" math (see computeStatusOperations' destOnlyQty in cardSaveDiff.ts)
-// cannot tell "genuinely separate stock" from "the row THIS save already
-// half-created" and double-counts it (Rockalanche NM x5 -> LP: attempt 1
-// creates LP x5 but its delete of NM fails; attempt 2 would otherwise read
-// LP x5 as pre-existing destination stock and add the modal's own 5 on top
-// -> LP x10, reported as success). Reset whenever the modal opens for a
-// (possibly different) card so it never leaks across cards.
-const migratedCardIds = new Set<string>()
+// TASK-318 (2nd review round): migratedCardIds (write-outcome bookkeeping
+// across retries) was REMOVED per Mato's explicit decision after the 2nd
+// BLOCK — it tracked too little (only rows THIS attempt wrote to, missing
+// pre-existing destination rows a status never touched — TASK-318-H2) and
+// the fix-the-bookkeeping direction kept growing new edge cases. The
+// replacement: after ANY partial failure, RELOAD from the server and reset
+// the modal's own state to that truth (see the anyFailed branch in
+// handleSave) — a retry is then an ordinary fresh save, no bookkeeping.
+//
+// openRelatedCardsSnapshot is the one thing that DOES need to survive a
+// post-failure reload: it's "what the modal showed the user at OPEN time",
+// used only to decide whether an old-identity row discovered during a save
+// was ALREADY part of what the user's on-screen quantities represent (skip
+// it — its quantity is already priced into what they set) or is a stray the
+// modal never showed them (M3 — add its quantity to the target instead of
+// discarding it). Reset only on a fresh open/close, never by the
+// post-failure reload — unlike migratedCardIds, this records what the user
+// SAW, not what any save attempt WROTE, so it can't accumulate write
+// outcomes across retries the way migratedCardIds did.
+let openRelatedCardsSnapshot: Card[] = []
 
 // Applies a related-cards list (memory-only, then later memory+server
-// merged) to relatedCards/statusDistribution/deckAllocations/
-// binderAllocations. Factored out so initializeForm can apply the
-// synchronous memory-only snapshot immediately and refine it in place once
-// the server read resolves, without duplicating this logic.
-const applyRelatedCards = (list: Card[]) => {
+// merged, or a post-failure reload) to relatedCards/statusDistribution/
+// deckAllocations/binderAllocations. Factored out so initializeForm can
+// apply the synchronous memory-only snapshot immediately and refine it in
+// place once the server read resolves, without duplicating this logic.
+//
+// TASK-318: `distributionSource` defaults to `list` but can differ — the
+// post-failure reload passes relatedCards.value = the UNION of old+new
+// identity rows (so allocations and the delete/migrate diff see everything
+// that physically exists) while summing statusDistribution from the NEW
+// identity's rows ONLY. Summing the union would double-count: if an update
+// from a previous attempt already landed (destination row already holds the
+// full merged quantity) and the old row still exists (its delete failed),
+// adding both would show — and then re-save — their sum instead of the
+// true target.
+const applyRelatedCards = (list: Card[], distributionSource: Card[] = list) => {
   relatedCards.value = list
 
   statusDistribution.value = {
@@ -359,7 +377,7 @@ const applyRelatedCards = (list: Card[]) => {
     trade: 0,
     wishlist: 0,
   }
-  for (const card of list) {
+  for (const card of distributionSource) {
     statusDistribution.value[card.status] += card.quantity
   }
 
@@ -392,10 +410,6 @@ const applyRelatedCards = (list: Card[]) => {
 const initializeForm = async () => {
   if (!props.card) return
   const myOpenToken = ++initOpenToken
-  // TASK-318 H1: a fresh open (even of the same card) starts a new save
-  // session — any previously "migrated" ids from an earlier open no longer
-  // describe what THIS session's own save is doing.
-  migratedCardIds.clear()
 
   // Get fresh card data from store (props.card might be stale reference)
   const freshCard = collectionStore.cards.find(c => c.id === props.card?.id) ?? props.card
@@ -416,6 +430,7 @@ const initializeForm = async () => {
   // identity. condition/foil/isPublic must be set here too (not after the
   // server read) for the same reason.
   applyRelatedCards(memoryRelatedCards)
+  openRelatedCardsSnapshot = memoryRelatedCards
   condition.value = freshCard.condition
   foil.value = freshCard.foil
   isPublic.value = freshCard.public ?? false
@@ -430,7 +445,9 @@ const initializeForm = async () => {
     freshCard.scryfallId, freshCard.condition, freshCard.foil,
   )
   if (myOpenToken === initOpenToken) {
-    applyRelatedCards(mergeServerCards(memoryRelatedCards, serverRelatedCards))
+    const merged = mergeServerCards(memoryRelatedCards, serverRelatedCards)
+    applyRelatedCards(merged)
+    openRelatedCardsSnapshot = merged
   }
 
   // Load available prints
@@ -671,6 +688,21 @@ const addBinderSlots = (base: Readonly<Record<string, number>>, extra: ReadonlyM
   return result
 }
 
+// TASK-318: memory + server merge for an ARBITRARY identity (not
+// necessarily the card the modal was opened for) — the same shape
+// initializeForm builds for its own open, factored out so the
+// post-partial-failure reload (handleSave) can reuse it for both the OLD
+// and the NEW identity without duplicating the merge logic.
+const loadRelatedCardsForIdentity = async (
+  scryfallId: string, condition: CardCondition, foil: boolean,
+): Promise<Card[]> => {
+  const memoryMatches = collectionStore.cards.filter(c =>
+    c.scryfallId === scryfallId && c.condition === condition && c.foil === foil
+  )
+  const serverMatches = await collectionStore.fetchServerCardsByPrint(scryfallId, condition, foil)
+  return mergeServerCards(memoryMatches, serverMatches)
+}
+
 // Save changes
 const handleSave = async () => {
   if (isLoading.value) return
@@ -728,35 +760,30 @@ const handleSave = async () => {
     // second `collection` doc got CREATED instead of the `sale` doc being
     // UPDATED. fetchServerCardsByPrint never hangs and never throws (it
     // resolves to [] on failure/timeout), so this cannot stall handleSave.
-    const serverCardsForIdentity = await collectionStore.fetchServerCardsByPrint(
-      identity.scryfallId, identity.condition, identity.foil,
-    )
-
-    // TASK-318 M3: an identity change can leave a stray row of the OLD
+    //
+    // TASK-318 M3 / LOW-3: also re-read the OLD identity whenever it
+    // changed — an identity change can leave a stray row of the OLD
     // identity that exists ONLY on the server (the exact TASK-280 gap, now
     // against the identity the modal is moving AWAY from instead of the one
-    // it's editing — a slow/failed initial load, or a write from elsewhere,
-    // between open and save). Re-read the old identity too whenever it
-    // changed so that row is folded into the diff instead of surviving next
-    // to the new one.
-    const oldIdentityServerCards = identityChanged
-      ? await collectionStore.fetchServerCardsByPrint(
-          savedCard.scryfallId, savedCard.condition, savedCard.foil,
-        )
-      : []
+    // it's editing). Run both reads in PARALLEL (Promise.all) instead of
+    // sequentially — on slow 4G this was up to 2x CARD_WRITE_TIMEOUT_MS of
+    // pure latency before any write even started.
+    const [serverCardsForIdentity, oldIdentityServerCards] = await Promise.all([
+      collectionStore.fetchServerCardsByPrint(identity.scryfallId, identity.condition, identity.foil),
+      identityChanged
+        ? collectionStore.fetchServerCardsByPrint(savedCard.scryfallId, savedCard.condition, savedCard.foil)
+        : Promise.resolve([] as Card[]),
+    ])
     const existingCardsForSave = mergeServerCards(
       mergeServerCards(collectionStore.cards, serverCardsForIdentity),
       oldIdentityServerCards,
     )
 
-    // TASK-318 H1/M3: the "source" the diff folds away is not just what the
-    // modal showed at open (savedRelatedCards) — it's every row belonging to
-    // this card's OLD identity, including ones only the server knows about
-    // (M3), PLUS any row THIS modal session already migrated onto the NEW
-    // identity in an earlier, partially-failed save attempt (H1: without
-    // this, a retry's "pre-existing destination stock" math in
-    // computeStatusOperations cannot tell a genuinely separate row from the
-    // row THIS save already half-created, and double-counts it).
+    // TASK-318 M3: the "source" the diff folds away is every row belonging
+    // to this card's OLD identity, including ones only the server knows
+    // about. migratedCardIds (write-outcome bookkeeping across retries) was
+    // REMOVED per Mato's decision after the 2nd review round — see the
+    // reload-and-reset branch below instead.
     const isOldPrint = (c: Card) =>
       c.scryfallId === savedCard.scryfallId &&
       c.condition === savedCard.condition &&
@@ -764,8 +791,25 @@ const handleSave = async () => {
     const sourceCardsForDiff = Array.from(new Map([
       ...savedRelatedCards,
       ...existingCardsForSave.filter(isOldPrint),
-      ...existingCardsForSave.filter(c => migratedCardIds.has(c.id)),
     ].map(c => [c.id, c] as const)).values())
+
+    // TASK-318 M3 (was: silently deleted, losing stock): an old-identity row
+    // the modal never showed at open (openRelatedCardsSnapshot — stable for
+    // the whole modal session, NOT touched by a post-failure reload, unlike
+    // relatedCards.value/savedRelatedCards) must have its quantity MIGRATED
+    // into the matching status' target, not just folded into the delete set
+    // and its stock lost. Gated on openRelatedCardsSnapshot specifically
+    // (not savedRelatedCards) so a row already priced into what the user
+    // edited — including one the post-failure reload re-displayed — is
+    // never added a second time; see the reload branch below for why that
+    // distinction matters.
+    const openRelatedCardIds = new Set(openRelatedCardsSnapshot.map(c => c.id))
+    const sourceExtraCards = existingCardsForSave.filter(c => isOldPrint(c) && !openRelatedCardIds.has(c.id))
+    const distributionForDiff = { ...savedDistribution }
+    for (const c of sourceExtraCards) {
+      // eslint-disable-next-line security/detect-object-injection
+      distributionForDiff[c.status] += c.quantity
+    }
 
     // TASK-318 M2: rows already sitting at the NEW identity that are NOT
     // part of sourceCardsForDiff (case 4's "LP x2 already for sale") have
@@ -825,21 +869,13 @@ const handleSave = async () => {
     // with print-relaxed self-heal for legacy duplicates (see cardSaveDiff.ts).
     // TASK-318: sourceCardsForDiff (not just savedRelatedCards) passed as `sourceCards` so a
     // condition/foil/print change folds the OLD-identity rows into the diff instead of
-    // leaving them behind — including server-only strays (M3) and this session's own
-    // already-migrated rows from a prior partial-failure retry (H1).
-    const ops = computeStatusOperations(savedDistribution, identity, existingCardsForSave, sourceCardsForDiff)
+    // leaving them behind — including server-only strays (M3, migrated via
+    // distributionForDiff instead of savedDistribution so their quantity isn't lost).
+    const ops = computeStatusOperations(distributionForDiff, identity, existingCardsForSave, sourceCardsForDiff)
     const { idsByStatus, anySucceeded: step2Succeeded, anyFailed: step2Failed } =
       await applyStatusOperations(ops, cardData, existingCardsForSave)
     if (step2Succeeded) anySucceeded = true
     if (step2Failed) anyFailed = true
-
-    // TASK-318 H1: record every id this attempt actually wrote to at the NEW
-    // identity — success or partial-success alike — so a RETRY (the modal
-    // stays open on anyFailed below) knows these rows are its OWN prior work,
-    // not separate pre-existing destination stock to add on top of.
-    for (const id of Object.values(idsByStatus)) {
-      if (id) migratedCardIds.add(id)
-    }
 
     // SCRUM-35 D2: STEP 3 unified — diff (mb, sb) per deck and dispatch ops.
     // ownedCardId prefers collection > sale > trade > wishlist (any cardId works as
@@ -925,6 +961,45 @@ const handleSave = async () => {
     // instead of the generic saveError, since "nothing was saved" would be
     // false in that case.
     if (anyFailed) {
+      // TASK-318 (2nd review round, Mato's decision): "recargar despues de
+      // un fallo" — reload from the server after ANY partial failure and
+      // reset the modal's state to that truth, instead of retry-bookkeeping
+      // (migratedCardIds, removed). A retry is then an ordinary fresh save.
+      // Re-read BOTH identities in parallel: the OLD identity may still hold
+      // a row (a failed delete), the NEW identity may already hold the
+      // result of whatever DID succeed (a landed create/update).
+      const [reloadedNew, reloadedOld] = await Promise.all([
+        loadRelatedCardsForIdentity(identity.scryfallId, identity.condition, identity.foil),
+        loadRelatedCardsForIdentity(savedCard.scryfallId, savedCard.condition, savedCard.foil),
+      ])
+      const reloadedUnion = Array.from(new Map(
+        [...reloadedNew, ...reloadedOld].map(c => [c.id, c] as const)
+      ).values())
+
+      if (reloadedUnion.length === 0) {
+        // Neither identity found ANY row anywhere (memory or server) — this
+        // modal was open on a real card, so a truly empty reload means the
+        // reload itself is unreliable (both reads failed/timed out, or
+        // returned nothing where something must exist), not that the card
+        // is legitimately gone. Retrying from an empty/stale snapshot risks
+        // treating real stock as absent and losing it on the next save, so
+        // close instead of leaving the modal open on data we can't trust.
+        toastStore.show(t('cards.detailModal.saveError'), 'error')
+        handleClose()
+        return
+      }
+
+      // relatedCards.value becomes the UNION (both identities) so nothing
+      // physically real is hidden from allocations or the next diff's
+      // source set. statusDistribution is summed from the NEW identity's
+      // rows ONLY (see applyRelatedCards' distributionSource param) — if an
+      // earlier update/create already landed there, its quantity already
+      // reflects everything that attempt intended to move; summing the OLD
+      // identity's still-undeleted leftover on top would double-count
+      // exactly what H1/H2 already got wrong once. openRelatedCardsSnapshot
+      // is intentionally left untouched here — see its own comment above.
+      applyRelatedCards(reloadedUnion, reloadedNew)
+
       toastStore.show(
         t(anySucceeded ? 'cards.detailModal.savePartialError' : 'cards.detailModal.saveError'),
         'error',
@@ -957,7 +1032,7 @@ const handleClose = () => {
   // could briefly render leftover state from whichever card was open before
   // the next initializeForm's synchronous memory snapshot lands.
   initOpenToken++
-  migratedCardIds.clear()
+  openRelatedCardsSnapshot = []
   availablePrints.value = []
   selectedPrint.value = null
   relatedCards.value = []

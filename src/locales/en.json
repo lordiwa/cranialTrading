@@ -809,6 +809,7 @@
       "updated": "Card updated",
       "saveError": "Error saving changes",
       "savePartialError": "Save incomplete — some changes were saved, others were not. Please check and try again.",
+      "saveIncompleteError": "Save incomplete — some changes may not have been saved. Please check this card's details.",
       "priceHistory": {
         "toggle": "Price history",
         "noData": "Not enough data yet"

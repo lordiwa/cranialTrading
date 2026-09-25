@@ -95,6 +95,7 @@ import { nextTick } from 'vue'
 import CardDetailModal from '@/components/collection/CardDetailModal.vue'
 import { useCollectionStore } from '@/stores/collection'
 import { useDecksStore } from '@/stores/decks'
+import { useToastStore } from '@/stores/toast'
 import { makeCard } from '../helpers/fixtures'
 import type { Card } from '@/types/card'
 
@@ -342,14 +343,30 @@ describe('CardDetailModal — TASK-280 save must check Firestore before creating
 })
 
 // ────────────────────────────────────────────────────────────────────────────
-// TASK-318 review findings (H1, M2): the pure-function tests in
-// cardSaveDiff.test.ts / deckSlotDiff.test.ts / binderSlotDiff.test.ts only
-// ever exercise a single clean save — neither a RETRY after a partial
-// failure (H1) nor a merge into an ALREADY-EXISTING destination row that
-// itself carries allocations (M2) is reachable from those pure calls alone,
-// because both bugs live in how handleSave WIRES its inputs together across
-// two calls / two card rows. These need the real component + real
-// decks/collection store wiring.
+// TASK-318 review findings (M2, M3, and — 3rd review round — H3/H4/H5/H6):
+// the pure-function tests in cardSaveDiff.test.ts / deckSlotDiff.test.ts /
+// binderSlotDiff.test.ts only ever exercise a single clean save — a merge
+// into an ALREADY-EXISTING destination row that itself carries allocations
+// (M2), an old-identity row the modal never displayed (M3), and a
+// create/update failure's effect on the delete/migration steps that follow
+// it (H3-H6) all live in how handleSave WIRES its inputs together, not
+// reachable from those pure calls alone. These need the real component +
+// real decks/collection store wiring.
+//
+// 3rd round design (Mato's decision, "nunca borrar despues de un fallo"):
+// there is no more in-modal retry — ANY failure closes the modal with an
+// honest toast. The tests that used to click SAVE twice to exercise a retry
+// (H1, "case 4 + retry", "NEW-HIGH-1(b)", MEDIUM-2) are gone; that behavior
+// no longer exists to test. In its place: H3 (a create/update failure never
+// deletes anything, so the pre-existing row and its allocations survive
+// intact), H4/H5 (a create/update failure blocks EVERY delete globally, not
+// just the one for its own status — a status whose own create succeeded
+// still keeps its old row, a visible duplicate, rather than risk losing
+// data elsewhere), and the delete-only-failure case (every create/update
+// succeeded, only a delete failed — the "acceptable" outcome: a visible
+// duplicate, honest toast, nothing lost). H6 (double migration across
+// retries) is structurally impossible now — there is no second attempt for
+// a row to be counted twice by.
 // ────────────────────────────────────────────────────────────────────────────
 
 async function setCondition(value: string) {
@@ -359,79 +376,134 @@ async function setCondition(value: string) {
   await nextTick()
 }
 
-describe('CardDetailModal — TASK-318 identity-change retry and merge-allocation regressions', () => {
-  it('H1 regression: retrying SAVE after a partial failure does not double the already-migrated stock', async () => {
-    mockGetDocs.mockResolvedValue({
-      empty: false,
-      docs: [
-        docWith('nm-row', {
-          scryfallId: 'sf-h1', name: 'Rockalanche', edition: 'Set', setCode: 'SET',
-          quantity: 5, condition: 'NM', foil: false, price: 1, image: '', status: 'sale', public: false,
-          createdAt: fakeTimestamp(1000), updatedAt: fakeTimestamp(1000),
-        }),
-      ],
-    })
+function toastMessages(): string[] {
+  return (useToastStore().toasts as unknown as { message: string }[]).map(t => t.message)
+}
+
+describe('CardDetailModal — TASK-318 identity-change failure handling (never delete after a failure)', () => {
+  it('H3 regression: a failed create never deletes the old row — NM x5 and its deck allocation survive intact, modal closes with an honest error', async () => {
+    mockGetDocs.mockResolvedValue({ empty: true, docs: [] })
 
     const collectionStore = useCollectionStore()
-    const card = makeCard({
-      id: 'nm-row', scryfallId: 'sf-h1', edition: 'Set', setCode: 'SET',
+    const nmCard = makeCard({
+      id: 'nm-row', scryfallId: 'sf-h3', edition: 'Set', setCode: 'SET',
       condition: 'NM', foil: false, status: 'sale', quantity: 5,
     })
-    collectionStore.cards = [card] as any
+    collectionStore.cards = [nmCard] as any
 
-    const wrapper = mount(CardDetailModal, { props: { show: true, card }, attachTo: document.body })
+    const decksStore = useDecksStore()
+    decksStore.decks = [{
+      id: 'D1', userId: 'test-user-id', name: 'Deck1', format: 'standard',
+      description: '', colors: [], thumbnail: '',
+      allocations: [{ cardId: 'nm-row', quantity: 3, isInSideboard: false, addedAt: new Date() }],
+      wishlist: [],
+      stats: { totalCards: 3, ownedCards: 3, totalPrice: 0, avgPrice: 0, sideboardCards: 0, wishlistCards: 0, completionPercentage: 100 },
+      isPublic: false, createdAt: new Date(), updatedAt: new Date(),
+    }] as any
+
+    const wrapper = mount(CardDetailModal, { props: { show: true, card: nmCard }, attachTo: document.body })
     await flushPromises()
     expect(qtyText('qty-row-sale')).toBe('5')
 
     await setCondition('LP')
 
-    // First attempt: the delete of the old (NM) row fails; the create of
-    // the new (LP) row still succeeds — computeStatusOperations' M1 reorder
-    // (create/update before delete) means the create is not blocked by the
-    // delete failure.
-    mockDeleteDoc.mockRejectedValueOnce(new Error('simulated delete failure'))
+    // The only op this save needs is a create (no existing LP row). It fails.
+    mockSetDoc.mockRejectedValueOnce(new Error('simulated create failure'))
 
     const saveButton = findButtonByText('common.actions.save')
     expect(saveButton).toBeTruthy()
     saveButton!.click()
     await flushPromises()
-    await new Promise(resolve => setTimeout(resolve, 300)) // see HIGH-1 test above: first dynamic import compile delay
+    await new Promise(resolve => setTimeout(resolve, 300))
     await flushPromises()
 
-    // Retry: same SAVE click. Before the 2nd-round fix, relatedCards/
-    // statusDistribution were never refreshed after the partial failure, so
-    // this retry still worked from attempt 1's stale inputs. Now the modal
-    // reloads from the server on the failure above and resets its state to
-    // that truth BEFORE this click happens.
+    // The regression this locks: before this round, the delete of nm-row
+    // (queued right after the failed create) still ran regardless, and
+    // STEP 3 still deallocated the deck — the create's failure meant NO
+    // replacement row ever existed, so the cards and the allocation were
+    // both just gone.
+    const finalRows = (collectionStore.cards as unknown as Card[]).filter(c => c.scryfallId === 'sf-h3')
+    expect(finalRows).toHaveLength(1)
+    expect(finalRows[0]).toMatchObject({ id: 'nm-row', condition: 'NM', quantity: 5 })
+
+    const deck = decksStore.decks.find(d => d.id === 'D1')
+    expect(deck?.allocations).toHaveLength(1)
+    expect(deck?.allocations[0]).toMatchObject({ cardId: 'nm-row', quantity: 3 })
+
+    // L1: assert the toast and the close, not just the rows. Nothing
+    // succeeded (the create was the only op), so the plain saveError is the
+    // honest message — never "incomplete" when literally nothing landed.
+    expect(toastMessages()).toContain('cards.detailModal.saveError')
+    expect(wrapper.emitted('close')).toBeTruthy()
+
+    wrapper.unmount()
+  })
+
+  it('H4/H5 regression: one status\' create failing blocks EVERY delete globally — a status whose own create succeeded still keeps its old row rather than risk data loss', async () => {
+    mockGetDocs.mockResolvedValue({ empty: true, docs: [] })
+
+    const collectionStore = useCollectionStore()
+    const nmSale = makeCard({
+      id: 'nm-sale', scryfallId: 'sf-h4', edition: 'Set', setCode: 'SET',
+      condition: 'NM', foil: false, status: 'sale', quantity: 3,
+    })
+    const nmTrade = makeCard({
+      id: 'nm-trade', scryfallId: 'sf-h4', edition: 'Set', setCode: 'SET',
+      condition: 'NM', foil: false, status: 'trade', quantity: 2,
+    })
+    collectionStore.cards = [nmSale, nmTrade] as any
+
+    const wrapper = mount(CardDetailModal, { props: { show: true, card: nmSale }, attachTo: document.body })
+    await flushPromises()
+    expect(qtyText('qty-row-sale')).toBe('3')
+
+    await setCondition('LP')
+
+    // computeStatusOperations' global M1 order creates 'sale' before
+    // 'trade' (STATUS_ORDER). Let the first create (sale) succeed, the
+    // second (trade) fail.
+    mockSetDoc.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('trade create fails'))
+
+    const saveButton = findButtonByText('common.actions.save')
     saveButton!.click()
     await flushPromises()
     await new Promise(resolve => setTimeout(resolve, 300))
     await flushPromises()
 
-    // TASK-318 (2nd review round): assert the FINAL PERSISTED state, not
-    // call counts — the regression this locks is that a retry converges to
-    // exactly ONE live row at LP x5 with none left at NM, whichever ops
-    // sequence got there. Before the fix, this retry instead read the LP
-    // row created by attempt 1 as SEPARATE pre-existing destination stock
-    // and added the modal's own 5 on top of it (quantity 10, reported as a
-    // clean success).
-    const finalRows = (collectionStore.cards as unknown as Card[]).filter(c => c.scryfallId === 'sf-h1')
-    expect(finalRows).toHaveLength(1)
-    expect(finalRows[0]).toMatchObject({ condition: 'LP', quantity: 5 })
+    // The regression: nm-sale's OWN create succeeded, but because
+    // nm-trade's create failed, NO delete anywhere is allowed to run — not
+    // even nm-sale's, which "could have" safely gone. That's the accepted
+    // cost of a single global gate (point 1 of Mato's decision): a status
+    // whose own create succeeded still keeps its old row, a visible
+        // duplicate, rather than risk deleting a row whose replacement never
+    // landed. Nothing is EVER lost: nm-sale, nm-trade, and the new LP sale
+    // row all still exist; no LP trade row was created.
+    const finalCards = collectionStore.cards as unknown as Card[]
+    const finalSale = finalCards.filter(c => c.scryfallId === 'sf-h4' && c.status === 'sale')
+    const finalTrade = finalCards.filter(c => c.scryfallId === 'sf-h4' && c.status === 'trade')
+    expect(finalSale.map(c => `${c.condition}:${c.quantity}`).sort()).toEqual(['LP:3', 'NM:3'])
+    expect(finalTrade).toHaveLength(1)
+    expect(finalTrade[0]).toMatchObject({ id: 'nm-trade', condition: 'NM', quantity: 2 })
+
+    // L1/L3: something DID succeed (the sale create), so the honest message
+    // is "incomplete", not the bare "nothing was saved" saveError.
+    expect(toastMessages()).toContain('cards.detailModal.saveIncompleteError')
+    expect(toastMessages()).not.toContain('cards.detailModal.saveError')
+    expect(wrapper.emitted('close')).toBeTruthy()
 
     wrapper.unmount()
   })
 
-  it('case 4 + retry regression: a failed delete during a merge-into-existing-row save still converges to the correct merged total (LP x7), deck allocation preserved', async () => {
+  it('delete-only failure (point 4, acceptable outcome): every create/update succeeds, only the delete fails — visible duplicate, deck fully migrated, nothing lost', async () => {
     mockGetDocs.mockResolvedValue({ empty: true, docs: [] })
 
     const collectionStore = useCollectionStore()
     const nmCard = makeCard({
-      id: 'nm-row', scryfallId: 'sf-c4r', edition: 'Set', setCode: 'SET',
+      id: 'nm-row', scryfallId: 'sf-c4d', edition: 'Set', setCode: 'SET',
       condition: 'NM', foil: false, status: 'sale', quantity: 5,
     })
     const existingLpCard = makeCard({
-      id: 'existing-lp', scryfallId: 'sf-c4r', edition: 'Set', setCode: 'SET',
+      id: 'existing-lp', scryfallId: 'sf-c4d', edition: 'Set', setCode: 'SET',
       condition: 'LP', foil: false, status: 'sale', quantity: 2,
     })
     collectionStore.cards = [nmCard, existingLpCard] as any
@@ -452,9 +524,8 @@ describe('CardDetailModal — TASK-318 identity-change retry and merge-allocatio
 
     await setCondition('LP')
 
-    // First attempt: the update that merges into the existing LP row lands
-    // (M1's create/update-before-delete), but the delete of the now-folded
-    // NM row fails.
+    // The merge-into-existing-row update succeeds; only the delete of the
+    // now-folded NM row fails.
     mockDeleteDoc.mockRejectedValueOnce(new Error('simulated delete failure'))
 
     const saveButton = findButtonByText('common.actions.save')
@@ -463,66 +534,23 @@ describe('CardDetailModal — TASK-318 identity-change retry and merge-allocatio
     await new Promise(resolve => setTimeout(resolve, 300))
     await flushPromises()
 
-    // Retry after the reload-and-reset.
-    saveButton!.click()
-    await flushPromises()
-    await new Promise(resolve => setTimeout(resolve, 300))
-    await flushPromises()
-
-    const finalRows = (collectionStore.cards as unknown as Card[]).filter(c => c.scryfallId === 'sf-c4r')
-    expect(finalRows).toHaveLength(1)
-    expect(finalRows[0]).toMatchObject({ condition: 'LP', quantity: 7 })
+    // Point 4: this is the ONE acceptable failure shape — every
+    // create/update landed (existing-lp correctly merged to 7), so STEP 3
+    // still ran and fully migrated the deck allocation. nm-row survives as
+    // a visible duplicate (its own delete failed) instead of being lost.
+    const finalCards = collectionStore.cards as unknown as Card[]
+    const finalForPrint = finalCards.filter(c => c.scryfallId === 'sf-c4d')
+    expect(finalForPrint.map(c => `${c.id}:${c.condition}:${c.quantity}`).sort()).toEqual([
+      'existing-lp:LP:7',
+      'nm-row:NM:5',
+    ])
 
     const deck = decksStore.decks.find(d => d.id === 'D1')
     expect(deck?.allocations).toHaveLength(1)
     expect(deck?.allocations[0]).toMatchObject({ cardId: 'existing-lp', quantity: 5, isInSideboard: false })
 
-    wrapper.unmount()
-  })
-
-  it('NEW-HIGH-1(b) regression: a row in an UNRELATED status at the new identity (e.g. LP trade) survives a retry untouched', async () => {
-    mockGetDocs.mockResolvedValue({ empty: true, docs: [] })
-
-    const collectionStore = useCollectionStore()
-    const nmCard = makeCard({
-      id: 'nm-row', scryfallId: 'sf-h2b', edition: 'Set', setCode: 'SET',
-      condition: 'NM', foil: false, status: 'sale', quantity: 5,
-    })
-    const lpTradeCard = makeCard({
-      id: 'lp-trade', scryfallId: 'sf-h2b', edition: 'Set', setCode: 'SET',
-      condition: 'LP', foil: false, status: 'trade', quantity: 2,
-    })
-    collectionStore.cards = [nmCard, lpTradeCard] as any
-
-    const wrapper = mount(CardDetailModal, { props: { show: true, card: nmCard }, attachTo: document.body })
-    await flushPromises()
-    expect(qtyText('qty-row-sale')).toBe('5')
-
-    await setCondition('LP')
-
-    mockDeleteDoc.mockRejectedValueOnce(new Error('simulated delete failure'))
-
-    const saveButton = findButtonByText('common.actions.save')
-    saveButton!.click()
-    await flushPromises()
-    await new Promise(resolve => setTimeout(resolve, 300))
-    await flushPromises()
-
-    saveButton!.click()
-    await flushPromises()
-    await new Promise(resolve => setTimeout(resolve, 300))
-    await flushPromises()
-
-    // The regression: before this fix, a retry treated the untouched
-    // lp-trade row as this attempt's own prior work and DELETED it instead
-    // of leaving it alone.
-    const finalCards = collectionStore.cards as unknown as Card[]
-    const finalSale = finalCards.filter(c => c.scryfallId === 'sf-h2b' && c.status === 'sale')
-    const finalTrade = finalCards.filter(c => c.scryfallId === 'sf-h2b' && c.status === 'trade')
-    expect(finalSale).toHaveLength(1)
-    expect(finalSale[0]).toMatchObject({ condition: 'LP', quantity: 5 })
-    expect(finalTrade).toHaveLength(1)
-    expect(finalTrade[0]).toMatchObject({ id: 'lp-trade', condition: 'LP', quantity: 2 })
+    expect(toastMessages()).toContain('cards.detailModal.saveIncompleteError')
+    expect(wrapper.emitted('close')).toBeTruthy()
 
     wrapper.unmount()
   })
@@ -573,12 +601,12 @@ describe('CardDetailModal — TASK-318 identity-change retry and merge-allocatio
     wrapper.unmount()
   })
 
-  it('MEDIUM-2 regression: a retry after STEP2 fully succeeded but STEP3 (deck allocation) failed no longer gets stuck on savePartialError forever', async () => {
+  it('STEP 3 (deck allocation) failure after STEP 2 fully succeeds: the card migration lands, the modal closes honestly, no retry loop', async () => {
     mockGetDocs.mockResolvedValue({ empty: true, docs: [] })
 
     const collectionStore = useCollectionStore()
     const nmCard = makeCard({
-      id: 'nm-row', scryfallId: 'sf-m2r', edition: 'Set', setCode: 'SET',
+      id: 'nm-row', scryfallId: 'sf-s3', edition: 'Set', setCode: 'SET',
       condition: 'NM', foil: false, status: 'sale', quantity: 5,
     })
     collectionStore.cards = [nmCard] as any
@@ -598,8 +626,11 @@ describe('CardDetailModal — TASK-318 identity-change retry and merge-allocatio
 
     await setCondition('LP')
 
-    // STEP 2 (status diff: create LP, delete NM) succeeds entirely. STEP 3
-    // (deck allocation, a deck write) fails once.
+    // STEP 2 (status diff: create LP, delete NM) succeeds entirely — the
+    // "never delete after a failure" gate only applies to STEP 2's OWN
+    // create/update ops, so a STEP 3 failure afterward doesn't stop STEP 2
+    // from having already landed. STEP 3 (deck allocation, a deck write)
+    // fails once.
     mockUpdateDoc.mockRejectedValueOnce(new Error('simulated deck write failure'))
 
     const saveButton = findButtonByText('common.actions.save')
@@ -608,20 +639,19 @@ describe('CardDetailModal — TASK-318 identity-change retry and merge-allocatio
     await new Promise(resolve => setTimeout(resolve, 300))
     await flushPromises()
 
-    // Retry #1: before this fix, relatedCards still referenced the deleted
-    // NM row, deleteCard could not find it, and every subsequent retry
-    // failed forever with savePartialError. Assert this retry can actually
-    // reach a clean save.
-    saveButton!.click()
-    await flushPromises()
-    await new Promise(resolve => setTimeout(resolve, 300))
-    await flushPromises()
-
+    // The card itself migrated correctly (STEP 2 unaffected by STEP 3's
+    // failure) — this is NOT a lost-cards case, only the deck allocation
+    // write failed. No retry: the modal closes with the honest
+    // "incomplete" toast (some things — STEP 2 — did succeed) instead of
+    // staying open, and there is no second SAVE click to make.
     expect(findButtonByText('common.actions.saving')).toBeFalsy()
     const finalCards = collectionStore.cards as unknown as Card[]
-    const finalRows = finalCards.filter(c => c.scryfallId === 'sf-m2r')
+    const finalRows = finalCards.filter(c => c.scryfallId === 'sf-s3')
     expect(finalRows).toHaveLength(1)
     expect(finalRows[0]).toMatchObject({ condition: 'LP', quantity: 5 })
+
+    expect(toastMessages()).toContain('cards.detailModal.saveIncompleteError')
+    expect(wrapper.emitted('close')).toBeTruthy()
 
     wrapper.unmount()
   })

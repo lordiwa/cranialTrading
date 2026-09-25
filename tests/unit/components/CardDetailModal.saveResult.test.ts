@@ -20,11 +20,17 @@
  *
  * AC1/AC2: any op returning failure must produce the ERROR toast, not the
  * success one — one test per surface named in the ticket.
- * AC3: on a failed save, the modal must NOT close (no emit('close') /
- * emit('saved')) and isLoading must still return to false so the user can
- * retry.
+ * AC3: on a failed save, isLoading must still return to false (SAVE button
+ * re-enabled) even though — TASK-318, 3rd review round, Mato's decision
+ * ("nunca borrar despues de un fallo") — the modal now ALWAYS closes on any
+ * failure, with no in-modal retry: emit('close') is expected TRUE on every
+ * failure path below, the opposite of this ticket's original AC3 ("must
+ * NOT close"). See CardDetailModal.saveIdentity.test.ts for the H3-H6
+ * tests covering WHY (never deleting after a failed create/update).
  * AC5: a partial failure (some ops wrote before another failed) must show
- * a distinct "incomplete" message, not the generic error.
+ * a distinct "incomplete" message (saveIncompleteError, not the original
+ * savePartialError — TASK-318 3rd round: that wording invited a retry that
+ * no longer exists), not the generic error.
  *
  * Mirrors the mount/mock scaffolding of CardDetailModal.saveIdentity.test.ts
  * (TASK-280) but overrides individual store action functions directly
@@ -204,7 +210,10 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     expect(toastStore.toasts.some(t => t.type === 'success')).toBe(false)
     expect(toastStore.toasts.some(t => t.type === 'error')).toBe(true)
     expect(wrapper.emitted('saved')).toBeFalsy()
-    expect(wrapper.emitted('close')).toBeFalsy()
+    // TASK-318 3rd round: the modal now closes on ANY failure (no in-modal
+    // retry) — 'saved' still never fires (nothing to report success on),
+    // but 'close' now does.
+    expect(wrapper.emitted('close')).toBeTruthy()
 
     wrapper.unmount()
   })
@@ -228,7 +237,10 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     const toastStore = useToastStore()
     expect(toastStore.toasts.some(t => t.type === 'success')).toBe(false)
     expect(toastStore.toasts.some(t => t.type === 'error')).toBe(true)
-    expect(wrapper.emitted('close')).toBeFalsy()
+    // TASK-318 3rd round: create succeeded, only the delete failed —
+    // point 4's "acceptable" outcome (visible duplicate, no loss). The
+    // modal closes with the honest incomplete-save toast, no retry.
+    expect(wrapper.emitted('close')).toBeTruthy()
 
     wrapper.unmount()
   })
@@ -250,7 +262,10 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     const toastStore = useToastStore()
     expect(toastStore.toasts.some(t => t.type === 'success')).toBe(false)
     expect(toastStore.toasts.some(t => t.type === 'error')).toBe(true)
-    expect(wrapper.emitted('close')).toBeFalsy()
+    // TASK-318 3rd round: the failed create means no delete anywhere runs
+    // (never delete after a failure) and the modal closes with the honest
+    // incomplete-save toast, no retry.
+    expect(wrapper.emitted('close')).toBeTruthy()
 
     wrapper.unmount()
   })
@@ -273,7 +288,9 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     const toastStore = useToastStore()
     expect(toastStore.toasts.some(t => t.type === 'success')).toBe(false)
     expect(toastStore.toasts.some(t => t.type === 'error')).toBe(true)
-    expect(wrapper.emitted('close')).toBeFalsy()
+    // TASK-318 3rd round: the modal now closes on ANY failure, including a
+    // STEP 3 (deck allocation) failure — no in-modal retry.
+    expect(wrapper.emitted('close')).toBeTruthy()
 
     wrapper.unmount()
   })
@@ -297,7 +314,8 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     const toastStore = useToastStore()
     expect(toastStore.toasts.some(t => t.type === 'success')).toBe(false)
     expect(toastStore.toasts.some(t => t.type === 'error')).toBe(true)
-    expect(wrapper.emitted('close')).toBeFalsy()
+    // TASK-318 3rd round: the modal now closes on ANY failure — no in-modal retry.
+    expect(wrapper.emitted('close')).toBeTruthy()
 
     wrapper.unmount()
   })
@@ -320,7 +338,8 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     const toastStore = useToastStore()
     expect(toastStore.toasts.some(t => t.type === 'success')).toBe(false)
     expect(toastStore.toasts.some(t => t.type === 'error')).toBe(true)
-    expect(wrapper.emitted('close')).toBeFalsy()
+    // TASK-318 3rd round: the modal now closes on ANY failure — no in-modal retry.
+    expect(wrapper.emitted('close')).toBeTruthy()
 
     wrapper.unmount()
   })
@@ -374,7 +393,8 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     const toastStore = useToastStore()
     expect(toastStore.toasts.some(t => t.type === 'success')).toBe(false)
     expect(toastStore.toasts.some(t => t.type === 'error')).toBe(true)
-    expect(wrapper.emitted('close')).toBeFalsy()
+    // TASK-318 3rd round: the modal now closes on ANY failure — no in-modal retry.
+    expect(wrapper.emitted('close')).toBeTruthy()
 
     wrapper.unmount()
   })
@@ -414,7 +434,11 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     const toastStore = useToastStore()
     const errorToast = toastStore.toasts.find(t => t.type === 'error')
     expect(errorToast).toBeTruthy()
-    expect(errorToast!.message).toBe('cards.detailModal.savePartialError')
+    // TASK-318 3rd round: savePartialError's old wording ("please check and
+    // try again") invited an in-modal retry that no longer exists —
+    // replaced by saveIncompleteError.
+    expect(errorToast!.message).toBe('cards.detailModal.saveIncompleteError')
+    expect(wrapper.emitted('close')).toBeTruthy()
 
     wrapper.unmount()
   })
@@ -439,7 +463,7 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     wrapper.unmount()
   })
 
-  it('MEDIUM-2 (AC4): reduceAllocationsForCard returning false (STEP 1) shows the error toast, not success, and the modal does not close', async () => {
+  it('MEDIUM-2 (AC4): reduceAllocationsForCard returning false (STEP 1) shows the error toast, not success, and the modal closes (TASK-318 3rd round: no in-modal retry)', async () => {
     // AC4 implemented reduceAllocationsForCard: Promise<boolean> but nothing
     // exercised handleSave's STEP 1 branch actually consuming that boolean —
     // reviewer finding. STEP 1 only runs when owned qty drops below what's
@@ -463,7 +487,7 @@ describe('CardDetailModal.handleSave — TASK-281 must not show success when a w
     const toastStore = useToastStore()
     expect(toastStore.toasts.some(t => t.type === 'success')).toBe(false)
     expect(toastStore.toasts.some(t => t.type === 'error')).toBe(true)
-    expect(wrapper.emitted('close')).toBeFalsy()
+    expect(wrapper.emitted('close')).toBeTruthy()
 
     wrapper.unmount()
   })

@@ -809,6 +809,7 @@
       "updated": "Carta atualizada",
       "saveError": "Erro ao salvar alterações",
       "savePartialError": "Salvamento incompleto — algumas alterações foram salvas, outras não. Verifique e tente novamente.",
+      "saveIncompleteError": "Salvamento incompleto — algumas alterações podem não ter sido salvas. Verifique os detalhes desta carta.",
       "priceHistory": {
         "toggle": "Histórico de preço",
         "noData": "Dados insuficientes ainda"

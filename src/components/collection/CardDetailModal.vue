@@ -332,43 +332,24 @@ const showPublicOption = computed(() => {
 // superseded it, so a stale response can never clobber whatever is current.
 let initOpenToken = 0
 
-// TASK-318 (2nd review round): migratedCardIds (write-outcome bookkeeping
-// across retries) was REMOVED per Mato's explicit decision after the 2nd
-// BLOCK — it tracked too little (only rows THIS attempt wrote to, missing
-// pre-existing destination rows a status never touched — TASK-318-H2) and
-// the fix-the-bookkeeping direction kept growing new edge cases. The
-// replacement: after ANY partial failure, RELOAD from the server and reset
-// the modal's own state to that truth (see the anyFailed branch in
-// handleSave) — a retry is then an ordinary fresh save, no bookkeeping.
-//
-// openRelatedCardsSnapshot is the one thing that DOES need to survive a
-// post-failure reload: it's "what the modal showed the user at OPEN time",
-// used only to decide whether an old-identity row discovered during a save
-// was ALREADY part of what the user's on-screen quantities represent (skip
-// it — its quantity is already priced into what they set) or is a stray the
-// modal never showed them (M3 — add its quantity to the target instead of
-// discarding it). Reset only on a fresh open/close, never by the
-// post-failure reload — unlike migratedCardIds, this records what the user
-// SAW, not what any save attempt WROTE, so it can't accumulate write
-// outcomes across retries the way migratedCardIds did.
-let openRelatedCardsSnapshot: Card[] = []
+// TASK-318 (3rd review round, Mato's decision — "nunca borrar despues de
+// un fallo"): both migratedCardIds (retry-write-outcome bookkeeping, 2nd
+// round) AND the post-failure reload-and-reset mechanism it was replaced
+// with (also 2nd round) are GONE. Neither is needed once a failure can
+// never delete anything: handleSave now closes the modal on ANY failure
+// (see the anyFailed branch below) instead of leaving it open for an
+// in-modal retry, so there is no second attempt whose inputs need
+// reconciling with the first. openRelatedCardsSnapshot (which existed only
+// to keep the M3 migration check correct across a reload) is gone too —
+// with no reload, relatedCards.value never diverges from what the user
+// actually saw at open, so `savedRelatedCards` alone is that snapshot.
 
 // Applies a related-cards list (memory-only, then later memory+server
-// merged, or a post-failure reload) to relatedCards/statusDistribution/
-// deckAllocations/binderAllocations. Factored out so initializeForm can
-// apply the synchronous memory-only snapshot immediately and refine it in
-// place once the server read resolves, without duplicating this logic.
-//
-// TASK-318: `distributionSource` defaults to `list` but can differ — the
-// post-failure reload passes relatedCards.value = the UNION of old+new
-// identity rows (so allocations and the delete/migrate diff see everything
-// that physically exists) while summing statusDistribution from the NEW
-// identity's rows ONLY. Summing the union would double-count: if an update
-// from a previous attempt already landed (destination row already holds the
-// full merged quantity) and the old row still exists (its delete failed),
-// adding both would show — and then re-save — their sum instead of the
-// true target.
-const applyRelatedCards = (list: Card[], distributionSource: Card[] = list) => {
+// merged) to relatedCards/statusDistribution/deckAllocations/
+// binderAllocations. Factored out so initializeForm can apply the
+// synchronous memory-only snapshot immediately and refine it in place once
+// the server read resolves, without duplicating this logic.
+const applyRelatedCards = (list: Card[]) => {
   relatedCards.value = list
 
   statusDistribution.value = {
@@ -377,7 +358,7 @@ const applyRelatedCards = (list: Card[], distributionSource: Card[] = list) => {
     trade: 0,
     wishlist: 0,
   }
-  for (const card of distributionSource) {
+  for (const card of list) {
     statusDistribution.value[card.status] += card.quantity
   }
 
@@ -430,7 +411,6 @@ const initializeForm = async () => {
   // identity. condition/foil/isPublic must be set here too (not after the
   // server read) for the same reason.
   applyRelatedCards(memoryRelatedCards)
-  openRelatedCardsSnapshot = memoryRelatedCards
   condition.value = freshCard.condition
   foil.value = freshCard.foil
   isPublic.value = freshCard.public ?? false
@@ -445,9 +425,7 @@ const initializeForm = async () => {
     freshCard.scryfallId, freshCard.condition, freshCard.foil,
   )
   if (myOpenToken === initOpenToken) {
-    const merged = mergeServerCards(memoryRelatedCards, serverRelatedCards)
-    applyRelatedCards(merged)
-    openRelatedCardsSnapshot = merged
+    applyRelatedCards(mergeServerCards(memoryRelatedCards, serverRelatedCards))
   }
 
   // Load available prints
@@ -544,11 +522,23 @@ const adjustBinder = (binderId: string, delta: number) => {
 // modo de que handleSave se entere es mirar el valor de retorno. anySucceeded
 // / anyFailed dejan que handleSave arme el mensaje correcto (éxito / parcial
 // / error total) sin que esta función decida el toast por sí sola.
+//
+// TASK-318 (3rd review round, Mato's decision — "nunca borrar despues de un
+// fallo"): `ops` already arrives with every create/update before any delete
+// (computeStatusOperations' global M1 order), but that alone doesn't stop a
+// delete from running after a create/update elsewhere in the SAME call has
+// already failed — the array just gets iterated straight through. Split
+// explicitly instead: run every create/update first; if ANY of them fails,
+// skip the delete ops entirely and report `nonDestructiveFailed` so the
+// caller (handleSave) also skips the deck/binder migration that would
+// deallocate from the old (now correctly still-undeleted) rows. A row that
+// would have been folded away stays alive with its own stock intact — a
+// visible leftover duplicate at worst, never lost cards.
 const applyStatusOperations = async (
   ops: ReturnType<typeof computeStatusOperations>,
   cardData: { name: string; scryfallId: string; edition: string; setCode: string; image: string; price: number; condition: CardCondition; foil: boolean; isPublic: boolean },
   existingCards: Card[],
-): Promise<{ idsByStatus: Record<CardStatus, string | null>; anySucceeded: boolean; anyFailed: boolean }> => {
+): Promise<{ idsByStatus: Record<CardStatus, string | null>; anySucceeded: boolean; anyFailed: boolean; nonDestructiveFailed: boolean }> => {
   const idsByStatus: Record<CardStatus, string | null> = { collection: null, sale: null, trade: null, wishlist: null }
   let anySucceeded = false
   let anyFailed = false
@@ -572,41 +562,11 @@ const applyStatusOperations = async (
     // eslint-disable-next-line security/detect-object-injection
     if (canonical) idsByStatus[status] = canonical.id
   }
-  for (const op of ops) {
-    if (op.type === 'delete' && op.cardId) {
-      // TASK-280 HIGH-1: deleteCard resolves the card from memory
-      // (cards.value/cardsById/paginatedCards) and silently returns false —
-      // no Firestore write — if it isn't found there. A delete op can target
-      // a row that exists ONLY on the server (existingCards is memory
-      // MERGED with a server read), so pass that row as a fallback the
-      // store can delete by even though memory never held it.
-      const fallbackCard = existingCards.find(c => c.id === op.cardId)
-      const deleted = await collectionStore.deleteCard(op.cardId, fallbackCard)
-      if (deleted) {
-        anySucceeded = true
-        // TASK-318 M1 fallout: M1 now emits create/update BEFORE delete
-        // within a status, so a delete op can run AFTER a create/update for
-        // a DIFFERENT row of the SAME status already set idsByStatus[status]
-        // to the row that's actually surviving (e.g. update the destination
-        // row, then delete the now-folded-away source row of the same
-        // status). Blindly nulling on every successful delete clobbered
-        // that just-set id back to null — only null it when this delete
-        // targeted the row idsByStatus is CURRENTLY tracking for this
-        // status; deleting some other (already-superseded) row must not
-        // erase it.
-        // eslint-disable-next-line security/detect-object-injection
-        if (idsByStatus[op.status] === op.cardId) {
-          // eslint-disable-next-line security/detect-object-injection
-          idsByStatus[op.status] = null
-        }
-      } else {
-        // TASK-281 AC1: deleteCard resolved false — no Firestore write
-        // happened, so the row this status pointed at is still there.
-        // Leave idsByStatus[op.status] as the canonical id resolved above
-        // instead of nulling it out for a delete that never occurred.
-        anyFailed = true
-      }
-    } else if (op.type === 'update' && op.cardId) {
+  const nonDestructiveOps = ops.filter(op => op.type !== 'delete')
+  const destructiveOps = ops.filter(op => op.type === 'delete')
+
+  for (const op of nonDestructiveOps) {
+    if (op.type === 'update' && op.cardId) {
       const updated = await collectionStore.updateCard(op.cardId, {
         quantity: op.quantity, condition: cardData.condition, foil: cardData.foil,
         scryfallId: cardData.scryfallId, edition: cardData.edition, setCode: cardData.setCode,
@@ -634,7 +594,54 @@ const applyStatusOperations = async (
       }
     }
   }
-  return { idsByStatus, anySucceeded, anyFailed }
+
+  // TASK-318: `anyFailed` at this point reflects ONLY the create/update
+  // pass above — exactly what "never delete after a failure" needs to gate
+  // on. Captured before the delete loop (which may add its own failures)
+  // so the caller can tell the two apart.
+  const nonDestructiveFailed = anyFailed
+
+  if (!nonDestructiveFailed) {
+    for (const op of destructiveOps) {
+      if (!op.cardId) continue
+      // TASK-280 HIGH-1: deleteCard resolves the card from memory
+      // (cards.value/cardsById/paginatedCards) and silently returns false —
+      // no Firestore write — if it isn't found there. A delete op can target
+      // a row that exists ONLY on the server (existingCards is memory
+      // MERGED with a server read), so pass that row as a fallback the
+      // store can delete by even though memory never held it.
+      const fallbackCard = existingCards.find(c => c.id === op.cardId)
+      const deleted = await collectionStore.deleteCard(op.cardId, fallbackCard)
+      if (deleted) {
+        anySucceeded = true
+        // TASK-318 M1 fallout: a delete op can run for a DIFFERENT row of
+        // the SAME status than the one a preceding create/update already
+        // set idsByStatus[status] to (e.g. update the destination row, then
+        // delete the now-folded-away source row of the same status).
+        // Blindly nulling on every successful delete clobbered that
+        // just-set id back to null — only null it when this delete targeted
+        // the row idsByStatus is CURRENTLY tracking for this status;
+        // deleting some other (already-superseded) row must not erase it.
+        // eslint-disable-next-line security/detect-object-injection
+        if (idsByStatus[op.status] === op.cardId) {
+          // eslint-disable-next-line security/detect-object-injection
+          idsByStatus[op.status] = null
+        }
+      } else {
+        // TASK-281 AC1: deleteCard resolved false — no Firestore write
+        // happened, so the row this status pointed at is still there.
+        // Leave idsByStatus[op.status] as the canonical id resolved above
+        // instead of nulling it out for a delete that never occurred.
+        // TASK-318: this is the "acceptable" failure mode — every
+        // create/update already succeeded, so the target row already holds
+        // the correct merged quantity; this row just stays alive too
+        // (visible duplicate), never lost.
+        anyFailed = true
+      }
+    }
+  }
+
+  return { idsByStatus, anySucceeded, anyFailed, nonDestructiveFailed }
 }
 
 // SCRUM-35 D2: snapshot allocations grouped by (deckId × board) across ALL related
@@ -686,21 +693,6 @@ const addBinderSlots = (base: Readonly<Record<string, number>>, extra: ReadonlyM
     result[binderId] = (result[binderId] ?? 0) + qty
   }
   return result
-}
-
-// TASK-318: memory + server merge for an ARBITRARY identity (not
-// necessarily the card the modal was opened for) — the same shape
-// initializeForm builds for its own open, factored out so the
-// post-partial-failure reload (handleSave) can reuse it for both the OLD
-// and the NEW identity without duplicating the merge logic.
-const loadRelatedCardsForIdentity = async (
-  scryfallId: string, condition: CardCondition, foil: boolean,
-): Promise<Card[]> => {
-  const memoryMatches = collectionStore.cards.filter(c =>
-    c.scryfallId === scryfallId && c.condition === condition && c.foil === foil
-  )
-  const serverMatches = await collectionStore.fetchServerCardsByPrint(scryfallId, condition, foil)
-  return mergeServerCards(memoryMatches, serverMatches)
 }
 
 // Save changes
@@ -781,30 +773,24 @@ const handleSave = async () => {
 
     // TASK-318 M3: the "source" the diff folds away is every row belonging
     // to this card's OLD identity, including ones only the server knows
-    // about. migratedCardIds (write-outcome bookkeeping across retries) was
-    // REMOVED per Mato's decision after the 2nd review round — see the
-    // reload-and-reset branch below instead.
+    // about (a slow/failed initial load, or a write from elsewhere, between
+    // open and save).
     const isOldPrint = (c: Card) =>
       c.scryfallId === savedCard.scryfallId &&
       c.condition === savedCard.condition &&
       c.foil === savedCard.foil
+    const savedRelatedCardIds = new Set(savedRelatedCards.map(c => c.id))
     const sourceCardsForDiff = Array.from(new Map([
       ...savedRelatedCards,
       ...existingCardsForSave.filter(isOldPrint),
     ].map(c => [c.id, c] as const)).values())
 
     // TASK-318 M3 (was: silently deleted, losing stock): an old-identity row
-    // the modal never showed at open (openRelatedCardsSnapshot — stable for
-    // the whole modal session, NOT touched by a post-failure reload, unlike
-    // relatedCards.value/savedRelatedCards) must have its quantity MIGRATED
-    // into the matching status' target, not just folded into the delete set
-    // and its stock lost. Gated on openRelatedCardsSnapshot specifically
-    // (not savedRelatedCards) so a row already priced into what the user
-    // edited — including one the post-failure reload re-displayed — is
-    // never added a second time; see the reload branch below for why that
-    // distinction matters.
-    const openRelatedCardIds = new Set(openRelatedCardsSnapshot.map(c => c.id))
-    const sourceExtraCards = existingCardsForSave.filter(c => isOldPrint(c) && !openRelatedCardIds.has(c.id))
+    // the modal never showed at open (savedRelatedCards — what initializeForm
+    // loaded; with no more in-modal retry, this never diverges mid-session)
+    // must have its quantity MIGRATED into the matching status' target, not
+    // just folded into the delete set and its stock lost.
+    const sourceExtraCards = existingCardsForSave.filter(c => isOldPrint(c) && !savedRelatedCardIds.has(c.id))
     const distributionForDiff = { ...savedDistribution }
     for (const c of sourceExtraCards) {
       // eslint-disable-next-line security/detect-object-injection
@@ -872,138 +858,115 @@ const handleSave = async () => {
     // leaving them behind — including server-only strays (M3, migrated via
     // distributionForDiff instead of savedDistribution so their quantity isn't lost).
     const ops = computeStatusOperations(distributionForDiff, identity, existingCardsForSave, sourceCardsForDiff)
-    const { idsByStatus, anySucceeded: step2Succeeded, anyFailed: step2Failed } =
+    const { idsByStatus, anySucceeded: step2Succeeded, anyFailed: step2Failed, nonDestructiveFailed } =
       await applyStatusOperations(ops, cardData, existingCardsForSave)
     if (step2Succeeded) anySucceeded = true
     if (step2Failed) anyFailed = true
 
-    // SCRUM-35 D2: STEP 3 unified — diff (mb, sb) per deck and dispatch ops.
-    // ownedCardId prefers collection > sale > trade > wishlist (any cardId works as
-    // the destination — allocateCardToDeck splits owned/wishlist via card.quantity).
-    // We deallocate ALL related cardIds for any board that changed so legacy rows
-    // (post-Fase D dupes still mid-flight, wishlist rows from prior bugs) get cleaned.
-    const ownedCardId =
-      idsByStatus.collection ??
-      idsByStatus.sale ??
-      idsByStatus.trade ??
-      idsByStatus.wishlist ??
-      null
-    // TASK-318: includes destinationOnlyCards too — a pre-existing row at the
-    // new identity (M2's merge target) must also get deallocated-from as
-    // part of the "move everything onto ownedCardId" pass, same as any
-    // source row.
-    const relatedCardIdsAfterStep2 = Array.from(new Set([
-      ...sourceCardsForDiff.map(c => c.id),
-      ...destinationOnlyCards.map(c => c.id),
-      ...Object.values(idsByStatus).filter((v): v is string => !!v),
-    ]))
-    const slotOps = computeDeckSlotOps({
-      decks: allDecks.value.map(d => ({ deckId: d.id })),
-      originalSlots,
-      targetSlots: targetDeckSlots,
-      relatedCardIds: relatedCardIdsAfterStep2,
-      ownedCardId,
-      identityChanged,
-    })
-    for (const op of slotOps) {
-      if (op.type === 'deallocate') {
-        const ok = await decksStore.deallocateCard(op.deckId, op.cardId, op.isInSideboard)
-        if (ok) anySucceeded = true
-        else anyFailed = true
-      } else {
-        const result = await decksStore.allocateCardToDeck(op.deckId, op.cardId, op.quantity, op.isInSideboard)
-        // allocate ops are only ever emitted with quantity > 0 (computeDeckSlotOps
-        // guards targetQty > 0), so both counters at 0 means the write failed —
-        // not a legitimate "nothing to allocate" outcome.
-        if (result.allocated > 0 || result.wishlisted > 0) anySucceeded = true
-        else anyFailed = true
+    // TASK-318 (3rd review round): a failed create/update means the rows
+    // computeStatusOperations wanted to fold away were deliberately NOT
+    // deleted (applyStatusOperations' own guard) — they're still alive,
+    // still holding their own allocations. Deallocating from them here
+    // would be wrong (nothing was actually migrated onto ownedCardId, since
+    // that id may not even exist if the failed op was the create), so skip
+    // STEP 3/3.5 entirely in that case. Below, anyFailed is already true, so
+    // the modal closes with the honest "incomplete" message; STEP 3/3.5
+    // only need to run when the status diff is known-consistent.
+    if (!nonDestructiveFailed) {
+      // SCRUM-35 D2: STEP 3 unified — diff (mb, sb) per deck and dispatch ops.
+      // ownedCardId prefers collection > sale > trade > wishlist (any cardId works as
+      // the destination — allocateCardToDeck splits owned/wishlist via card.quantity).
+      // We deallocate ALL related cardIds for any board that changed so legacy rows
+      // (post-Fase D dupes still mid-flight, wishlist rows from prior bugs) get cleaned.
+      const ownedCardId =
+        idsByStatus.collection ??
+        idsByStatus.sale ??
+        idsByStatus.trade ??
+        idsByStatus.wishlist ??
+        null
+      // TASK-318: includes destinationOnlyCards too — a pre-existing row at the
+      // new identity (M2's merge target) must also get deallocated-from as
+      // part of the "move everything onto ownedCardId" pass, same as any
+      // source row.
+      const relatedCardIdsAfterStep2 = Array.from(new Set([
+        ...sourceCardsForDiff.map(c => c.id),
+        ...destinationOnlyCards.map(c => c.id),
+        ...Object.values(idsByStatus).filter((v): v is string => !!v),
+      ]))
+      const slotOps = computeDeckSlotOps({
+        decks: allDecks.value.map(d => ({ deckId: d.id })),
+        originalSlots,
+        targetSlots: targetDeckSlots,
+        relatedCardIds: relatedCardIdsAfterStep2,
+        ownedCardId,
+        identityChanged,
+      })
+      for (const op of slotOps) {
+        if (op.type === 'deallocate') {
+          const ok = await decksStore.deallocateCard(op.deckId, op.cardId, op.isInSideboard)
+          if (ok) anySucceeded = true
+          else anyFailed = true
+        } else {
+          const result = await decksStore.allocateCardToDeck(op.deckId, op.cardId, op.quantity, op.isInSideboard)
+          // allocate ops are only ever emitted with quantity > 0 (computeDeckSlotOps
+          // guards targetQty > 0), so both counters at 0 means the write failed —
+          // not a legitimate "nothing to allocate" outcome.
+          if (result.allocated > 0 || result.wishlisted > 0) anySucceeded = true
+          else anyFailed = true
+        }
+      }
+
+      // SCRUM-40 (QA gap): STEP 3.5 — diff per-binder totals and dispatch ops via bindersStore.
+      // Same pattern as deck slots: deallocate ALL related cardIds for a binder when total
+      // changed, then re-allocate target qty against ownedCardId. Binders cap at available
+      // collection qty internally — STEP 2 already updated collection above, so the cap reflects
+      // the new owned total.
+      const binderSlotOps = computeBinderSlotOps({
+        binders: allBinders.value.map(b => ({ binderId: b.id })),
+        originalSlots: originalBinderSlots,
+        targetSlots: targetBinderSlots,
+        relatedCardIds: relatedCardIdsAfterStep2,
+        ownedCardId,
+        identityChanged,
+      })
+      for (const op of binderSlotOps) {
+        if (op.type === 'deallocate') {
+          const ok = await bindersStore.deallocateCard(op.binderId, op.cardId)
+          if (ok) anySucceeded = true
+          else anyFailed = true
+        } else {
+          // TASK-281 HIGH-1: allocateCardToBinder can return allocated:0 for
+          // two different reasons — a real write failure (failed:true), or
+          // the availability cap being hit by design (failed:false; the
+          // binder "+" button has no upper bound in the UI, so this is
+          // reachable). Only the former is a save failure — treating the
+          // cap as a failure would show an error the user can never clear
+          // by retrying (the target/original slots stay at the same
+          // over-cap values forever).
+          const result = await bindersStore.allocateCardToBinder(op.binderId, op.cardId, op.quantity)
+          if (result.allocated > 0) anySucceeded = true
+          else if (result.failed) anyFailed = true
+        }
       }
     }
 
-    // SCRUM-40 (QA gap): STEP 3.5 — diff per-binder totals and dispatch ops via bindersStore.
-    // Same pattern as deck slots: deallocate ALL related cardIds for a binder when total
-    // changed, then re-allocate target qty against ownedCardId. Binders cap at available
-    // collection qty internally — STEP 2 already updated collection above, so the cap reflects
-    // the new owned total.
-    const binderSlotOps = computeBinderSlotOps({
-      binders: allBinders.value.map(b => ({ binderId: b.id })),
-      originalSlots: originalBinderSlots,
-      targetSlots: targetBinderSlots,
-      relatedCardIds: relatedCardIdsAfterStep2,
-      ownedCardId,
-      identityChanged,
-    })
-    for (const op of binderSlotOps) {
-      if (op.type === 'deallocate') {
-        const ok = await bindersStore.deallocateCard(op.binderId, op.cardId)
-        if (ok) anySucceeded = true
-        else anyFailed = true
-      } else {
-        // TASK-281 HIGH-1: allocateCardToBinder can return allocated:0 for
-        // two different reasons — a real write failure (failed:true), or
-        // the availability cap being hit by design (failed:false; the
-        // binder "+" button has no upper bound in the UI, so this is
-        // reachable). Only the former is a save failure — treating the
-        // cap as a failure would show an error the user can never clear
-        // by retrying (the target/original slots stay at the same
-        // over-cap values forever).
-        const result = await bindersStore.allocateCardToBinder(op.binderId, op.cardId, op.quantity)
-        if (result.allocated > 0) anySucceeded = true
-        else if (result.failed) anyFailed = true
-      }
-    }
-
-    // TASK-281 AC2/AC3/AC5: any failed write anywhere in the chain above
-    // means the user's change was NOT fully persisted — do not show
-    // success, do not emit saved/close (the modal stays open so the user
-    // can retry without losing what they entered). AC5: if something DID
-    // write before the failure, say so explicitly (savePartialError)
-    // instead of the generic saveError, since "nothing was saved" would be
-    // false in that case.
+    // TASK-318 (3rd review round, Mato's decision — "nunca borrar despues de
+    // un fallo"): ANY failure anywhere in the chain above closes the modal
+    // with an honest message — there is no more in-modal retry (the reload-
+    // and-reset mechanism from the 2nd round is gone). A failure now either
+    // leaves the previous state intact (a create/update failed — nothing
+    // was ever deleted) or leaves a VISIBLE extra row (a delete failed after
+    // every create/update already succeeded) — never lost cards. AC5: if
+    // something DID write, say so with saveIncompleteError (a NEW key —
+    // savePartialError's old "please check and try again" wording no longer
+    // applies, since there is nothing to retry inside this modal); if
+    // NOTHING wrote at all, the plain saveError is accurate.
     if (anyFailed) {
-      // TASK-318 (2nd review round, Mato's decision): "recargar despues de
-      // un fallo" — reload from the server after ANY partial failure and
-      // reset the modal's state to that truth, instead of retry-bookkeeping
-      // (migratedCardIds, removed). A retry is then an ordinary fresh save.
-      // Re-read BOTH identities in parallel: the OLD identity may still hold
-      // a row (a failed delete), the NEW identity may already hold the
-      // result of whatever DID succeed (a landed create/update).
-      const [reloadedNew, reloadedOld] = await Promise.all([
-        loadRelatedCardsForIdentity(identity.scryfallId, identity.condition, identity.foil),
-        loadRelatedCardsForIdentity(savedCard.scryfallId, savedCard.condition, savedCard.foil),
-      ])
-      const reloadedUnion = Array.from(new Map(
-        [...reloadedNew, ...reloadedOld].map(c => [c.id, c] as const)
-      ).values())
-
-      if (reloadedUnion.length === 0) {
-        // Neither identity found ANY row anywhere (memory or server) — this
-        // modal was open on a real card, so a truly empty reload means the
-        // reload itself is unreliable (both reads failed/timed out, or
-        // returned nothing where something must exist), not that the card
-        // is legitimately gone. Retrying from an empty/stale snapshot risks
-        // treating real stock as absent and losing it on the next save, so
-        // close instead of leaving the modal open on data we can't trust.
-        toastStore.show(t('cards.detailModal.saveError'), 'error')
-        handleClose()
-        return
-      }
-
-      // relatedCards.value becomes the UNION (both identities) so nothing
-      // physically real is hidden from allocations or the next diff's
-      // source set. statusDistribution is summed from the NEW identity's
-      // rows ONLY (see applyRelatedCards' distributionSource param) — if an
-      // earlier update/create already landed there, its quantity already
-      // reflects everything that attempt intended to move; summing the OLD
-      // identity's still-undeleted leftover on top would double-count
-      // exactly what H1/H2 already got wrong once. openRelatedCardsSnapshot
-      // is intentionally left untouched here — see its own comment above.
-      applyRelatedCards(reloadedUnion, reloadedNew)
-
       toastStore.show(
-        t(anySucceeded ? 'cards.detailModal.savePartialError' : 'cards.detailModal.saveError'),
+        t(anySucceeded ? 'cards.detailModal.saveIncompleteError' : 'cards.detailModal.saveError'),
         'error',
       )
+      handleClose()
       return
     }
 
@@ -1032,7 +995,6 @@ const handleClose = () => {
   // could briefly render leftover state from whichever card was open before
   // the next initializeForm's synchronous memory snapshot lands.
   initOpenToken++
-  openRelatedCardsSnapshot = []
   availablePrints.value = []
   selectedPrint.value = null
   relatedCards.value = []
